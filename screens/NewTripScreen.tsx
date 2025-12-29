@@ -1,20 +1,20 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trip } from '../types';
-
-interface Traveler {
-  id: string;
-  name: string;
-  image: string;
-  isMe?: boolean;
-}
+import { Trip, Traveler } from '../types';
 
 const NewTripScreen: React.FC = () => {
   const navigate = useNavigate();
   const [destination, setDestination] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Estado para modal de viajante
+  const [showTravelerModal, setShowTravelerModal] = useState(false);
+  const [newTravelerName, setNewTravelerName] = useState('');
+  
+  // Estado para calendário
+  const [currentDate, setCurrentDate] = useState(new Date());
+
   // Estado para seleção de datas
   const [startDate, setStartDate] = useState<number | null>(null);
   const [endDate, setEndDate] = useState<number | null>(null);
@@ -30,16 +30,16 @@ const NewTripScreen: React.FC = () => {
     }
   ]);
 
-  const handleAddTraveler = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const name = window.prompt("Nome do acompanhante:");
-    if (name && name.trim()) {
+  const handleAddTraveler = () => {
+    if (newTravelerName.trim()) {
       const newId = `traveler-${Date.now()}`;
       setTravelers(prev => [...prev, { 
         id: newId, 
-        name: name.trim(), 
+        name: newTravelerName.trim(), 
         image: `https://i.pravatar.cc/150?u=${newId}` 
       }]);
+      setNewTravelerName('');
+      setShowTravelerModal(false);
     }
   };
 
@@ -54,14 +54,23 @@ const NewTripScreen: React.FC = () => {
     }
 
     setLoading(true);
+    // Ajuste da preposição 'de' e formatação
+    const monthName = currentDate.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+    const year = currentDate.getFullYear();
+    
+    // Formatação "15 de Out - 20 de Out, 2024"
+    const formattedDateRange = `${startDate} de ${monthName}${endDate ? ` - ${endDate} de ${monthName}` : ''}, ${year}`;
+
     const newTrip: Trip = {
       id: Date.now().toString(),
       destination: destination,
       country: destination.split(',')[1]?.trim() || 'Destino',
-      dateRange: `${startDate}${endDate ? ` - ${endDate}` : ''} Jul, 2024`,
+      dateRange: formattedDateRange,
       imageUrl: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800',
       status: 'upcoming',
-      daysLeft: 45
+      daysLeft: 45,
+      travelers: travelers, // Salva os viajantes cadastrados
+      mediaCount: Math.floor(Math.random() * 50) // Mock inicial
     };
 
     const savedTrips = JSON.parse(localStorage.getItem('travelease_trips') || '[]');
@@ -73,11 +82,15 @@ const NewTripScreen: React.FC = () => {
     }, 600);
   };
 
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(currentDate.setMonth(currentDate.getMonth() + offset));
+    setCurrentDate(new Date(newDate));
+    // Limpar seleção ao mudar mês para simplificar logica visual deste protótipo
+    setStartDate(null);
+    setEndDate(null);
+  };
+
   const handleDayClick = (day: number) => {
-    // Lógica refinada: 
-    // 1. Se não tiver ida OU se já tiver ida e volta -> define nova ida
-    // 2. Se clicar em dia anterior à ida atual -> reinicia ciclo com nova ida
-    // 3. Senão -> define volta
     if (!startDate || (startDate && endDate) || (day < startDate)) {
       setStartDate(day);
       setEndDate(null);
@@ -88,8 +101,12 @@ const NewTripScreen: React.FC = () => {
     }
   };
 
+  // Helpers para exibição
+  const currentMonthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+  const shortMonthName = currentDate.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+
   return (
-    <div className="flex flex-col h-full bg-background-light dark:bg-background-dark animate-fade-in overflow-y-auto no-scrollbar">
+    <div className="flex flex-col h-full bg-background-light dark:bg-background-dark animate-fade-in overflow-y-auto no-scrollbar relative">
       {/* Header Fixo */}
       <div className="sticky top-0 z-20 flex items-center bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-100/50">
         <button onClick={() => navigate(-1)} className="flex w-20 items-center justify-start text-gray-400 font-medium text-sm">
@@ -125,21 +142,26 @@ const NewTripScreen: React.FC = () => {
           </div>
           
           <div className="flex gap-3">
-            <button onClick={() => setActiveInput('ida')} className={`flex-1 bg-white dark:bg-[#1A2633] rounded-2xl p-4 border-2 transition-all flex flex-col gap-1 text-left ${activeInput === 'ida' ? 'border-primary shadow-md' : 'border-transparent shadow-sm'}`}>
+            <button onClick={() => setActiveInput('ida')} className={`flex-1 bg-white dark:bg-[#1A2633] rounded-2xl p-4 border-2 transition-all flex flex-col gap-1 items-start text-left ${activeInput === 'ida' ? 'border-primary shadow-md' : 'border-transparent shadow-sm'}`}>
               <span className={`text-[10px] font-bold uppercase tracking-wider ${activeInput === 'ida' ? 'text-primary' : 'text-gray-400'}`}>Ida</span>
-              <span className="text-[15px] font-bold">{startDate ? `${startDate} Jul, 2024` : '--'}</span>
+              <span className="text-[15px] font-bold">{startDate ? `${startDate} de ${shortMonthName}` : '--'}</span>
             </button>
-            <button onClick={() => setActiveInput('volta')} className={`flex-1 bg-white dark:bg-[#1A2633] rounded-2xl p-4 border-2 transition-all flex flex-col gap-1 text-left ${activeInput === 'volta' ? 'border-primary shadow-md' : 'border-transparent shadow-sm'}`}>
+            <button onClick={() => setActiveInput('volta')} className={`flex-1 bg-white dark:bg-[#1A2633] rounded-2xl p-4 border-2 transition-all flex flex-col gap-1 items-start text-left ${activeInput === 'volta' ? 'border-primary shadow-md' : 'border-transparent shadow-sm'}`}>
               <span className={`text-[10px] font-bold uppercase tracking-wider ${activeInput === 'volta' ? 'text-primary' : 'text-gray-400'}`}>Volta</span>
-              <span className="text-[15px] font-bold">{endDate ? `${endDate} Jul, 2024` : '--'}</span>
+              <span className="text-[15px] font-bold">{endDate ? `${endDate} de ${shortMonthName}` : '--'}</span>
             </button>
           </div>
           
           <div className="bg-white dark:bg-[#1A2633] rounded-[24px] p-6 shadow-sm w-full border border-gray-50 dark:border-gray-800">
             <div className="flex items-center justify-between mb-6 px-1">
-              <span className="material-symbols-outlined text-[#111418] dark:text-white cursor-pointer font-bold">chevron_left</span>
-              <p className="text-[#111418] dark:text-white text-base font-bold">Julho 2024</p>
-              <span className="material-symbols-outlined text-[#111418] dark:text-white cursor-pointer font-bold">chevron_right</span>
+              <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                <span className="material-symbols-outlined text-[#111418] dark:text-white font-bold">chevron_left</span>
+              </button>
+              {/* Ajuste para Capitalize apenas no Mês */}
+              <p className="text-[#111418] dark:text-white text-base font-bold capitalize">{currentMonthName}</p>
+              <button onClick={() => changeMonth(1)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                <span className="material-symbols-outlined text-[#111418] dark:text-white font-bold">chevron_right</span>
+              </button>
             </div>
             <div className="grid grid-cols-7 gap-y-1 text-center">
               {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (<p key={d} className="text-[11px] font-bold text-gray-400 mb-4">{d}</p>))}
@@ -172,7 +194,10 @@ const NewTripScreen: React.FC = () => {
               </div>
             ))}
             <div className="flex flex-col items-center gap-2 shrink-0">
-              <button onClick={handleAddTraveler} className="w-14 h-14 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-primary active:scale-95 transition-all">
+              <button 
+                onClick={() => setShowTravelerModal(true)} 
+                className="w-14 h-14 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-primary active:scale-95 transition-all"
+              >
                 <span className="material-symbols-outlined text-[24px]">add</span>
               </button>
               <span className="text-[12px] font-bold text-gray-400">Adicionar</span>
@@ -186,6 +211,32 @@ const NewTripScreen: React.FC = () => {
           {loading ? <span className="animate-spin material-symbols-outlined">sync</span> : <><span className="material-symbols-outlined">flight_takeoff</span>Criar Viagem</>}
         </button>
       </div>
+
+      {/* MODAL ADICIONAR VIAJANTE */}
+      {showTravelerModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-3xl p-6 shadow-2xl animate-slide-up">
+            <h3 className="text-[16px] font-bold mb-4">Adicionar Acompanhante</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Nome</label>
+                <input 
+                  autoFocus
+                  value={newTravelerName}
+                  onChange={(e) => setNewTravelerName(e.target.value)}
+                  placeholder="Ex: João Silva"
+                  className="w-full bg-gray-50 dark:bg-gray-800 p-3 rounded-xl text-[13px] outline-none"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddTraveler()}
+                />
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => setShowTravelerModal(false)} className="flex-1 h-12 rounded-xl text-[12px] font-bold text-gray-400 bg-gray-100">Cancelar</button>
+                <button onClick={handleAddTraveler} className="flex-1 h-12 rounded-xl text-[12px] font-bold text-white bg-primary">Adicionar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

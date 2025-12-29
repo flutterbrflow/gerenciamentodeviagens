@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 
@@ -19,133 +19,98 @@ const BookingsScreen: React.FC = () => {
   const { id } = useParams(); // Se existir ID, veio de uma viagem específica
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Estado para Modais
   const [modalType, setModalType] = useState<'none' | 'boardingPass' | 'map' | 'details'>('none');
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  
+  const [bookings, setBookings] = useState<BookingItem[]>([]);
 
-  // Mock Data
-  const allBookings: BookingItem[] = [
-    // FLIGHT
-    {
-      id: 'flight1',
-      type: 'flights',
-      status: 'upcoming',
-      tripName: 'Viagem para Paris',
-      tripDate: '12 - 20 Out',
-      data: {
-        origin: 'São Paulo',
-        dest: 'Paris',
-        originCode: 'GRU',
-        destCode: 'CDG',
-        flightNum: 'AF 457',
-        departureTime: '14:00',
-        departureDate: '12 Out',
-        arrivalTime: '08:20',
-        arrivalDate: '13 Out',
-        duration: '11h 20m',
-        isDirect: true,
-        airline: 'Air France',
-        statusText: 'Confirmado'
-      }
-    },
-    // HOTEL
-    {
-      id: 'hotel1',
-      type: 'hotels',
-      status: 'upcoming',
-      tripName: 'Viagem para Paris',
-      tripDate: '12 - 20 Out',
-      data: {
-        name: 'ibis Styles Paris Eiffel Cambronne',
-        rating: 4.5,
-        reviews: 120,
-        checkIn: '13 Out, 14:00',
-        checkOut: '20 Out, 11:00',
-        image: 'hotel'
-      }
-    },
-    // ACTIVITY (Louvre)
-    {
-      id: 'activity1',
-      type: 'activities', // Será filtrado em "Todos"
-      status: 'upcoming',
-      tripName: 'Viagem para Paris',
-      tripDate: '12 - 20 Out',
-      data: {
-        name: 'Museu do Louvre - Tour Guiado',
-        date: '15 Out • 09:30 AM',
-        details: '2 Adultos • Código: LOUVRE23',
-        description: 'Entrada prioritária com guia especializado em história da arte. Ponto de encontro: Pirâmide invertida.',
-        statusText: 'Confirmado'
-      }
-    },
-    // CAR
-    {
-      id: 'car1',
-      type: 'cars',
-      status: 'upcoming',
-      tripName: 'Fim de semana em Buzios',
-      tripDate: '3 - 5 Nov',
-      data: {
-        name: 'Localiza - Jeep Compass',
-        model: 'SUV • Automático',
-        pickupDate: '3 Nov, 08:00',
-        pickupLoc: 'Aeroporto Santos Dumont (SDU)',
-        dropoffDate: '5 Nov, 20:00',
-        dropoffLoc: 'Aeroporto Santos Dumont (SDU)',
-        statusText: 'Pendente'
-      }
-    },
-    // ITEM PASSADO (Exemplo)
-    {
-      id: 'flight_past',
-      type: 'flights',
-      status: 'past',
-      tripName: 'Viagem para Londres',
-      tripDate: 'Jul 2024',
-      data: {
-        origin: 'Londres',
-        dest: 'São Paulo',
-        originCode: 'LHR',
-        destCode: 'GRU',
-        flightNum: 'BA 247',
-        departureTime: '21:00',
-        departureDate: '20 Jul',
-        arrivalTime: '05:00',
-        arrivalDate: '21 Jul',
-        duration: '11h',
-        isDirect: true,
-        airline: 'British Airways',
-        statusText: 'Concluído'
-      }
-    },
-    // ITEM CANCELADO (Exemplo)
-    {
-      id: 'hotel_cancel',
-      type: 'hotels',
-      status: 'cancelled',
-      tripName: 'Viagem para Londres',
-      tripDate: 'Jul 2024',
-      data: {
-        name: 'The Ritz London',
-        rating: 5.0,
-        reviews: 2000,
-        checkIn: '12 Jul',
-        checkOut: '15 Jul',
-        image: 'hotel'
-      }
+  useEffect(() => {
+    // Carregar do localStorage
+    const savedBookings = JSON.parse(localStorage.getItem('travelease_bookings') || '[]');
+
+    // Se não houver dados, inicializar com mock completo para todas as viagens
+    if (savedBookings.length === 0) {
+        const initialBookings: BookingItem[] = [
+          // TRIP 1: Paris
+          {
+            id: 'f_paris', type: 'flights', status: 'upcoming', tripName: 'Paris, França', tripDate: '10 - 24 Out/2024',
+            data: { origin: 'São Paulo', dest: 'Paris', originCode: 'GRU', destCode: 'CDG', flightNum: 'AF 457', departureTime: '14:00', departureDate: '10 Out', arrivalTime: '08:20', arrivalDate: '11 Out', duration: '11h 20m', isDirect: true, airline: 'Air France', statusText: 'Confirmado' }
+          },
+          {
+            id: 'h_paris', type: 'hotels', status: 'upcoming', tripName: 'Paris, França', tripDate: '10 - 24 Out/2024',
+            data: { name: 'ibis Styles Paris Eiffel Cambronne', rating: 4.5, reviews: 120, checkIn: '11 Out, 14:00', checkOut: '24 Out, 11:00', image: 'hotel' }
+          },
+          // TRIP 2: Tokyo
+          {
+            id: 'f_tokyo', type: 'flights', status: 'upcoming', tripName: 'Tóquio, Japão', tripDate: '15 - 30 Dez/2024',
+            data: { origin: 'São Paulo', dest: 'Tóquio', originCode: 'GRU', destCode: 'HND', flightNum: 'NH 224', departureTime: '01:30', departureDate: '15 Dez', arrivalTime: '15:00', arrivalDate: '16 Dez', duration: '24h 30m', isDirect: false, airline: 'ANA', statusText: 'Confirmado' }
+          },
+          // TRIP 3: Rio
+          {
+            id: 'h_rio', type: 'hotels', status: 'upcoming', tripName: 'Rio de Janeiro, Brasil', tripDate: '20 - 28 Fev/2025',
+            data: { name: 'Copacabana Palace', rating: 5.0, reviews: 2500, checkIn: '20 Fev, 14:00', checkOut: '28 Fev, 12:00', image: 'hotel' }
+          },
+          // TRIP 4: Londres
+          {
+            id: 'c_london', type: 'cars', status: 'upcoming', tripName: 'Londres, Reino Unido', tripDate: '12 - 20 Jul/2024',
+            data: { name: 'Hertz', model: 'Mini Cooper', pickupDate: '13 Jul, 09:00', pickupLoc: 'Heathrow Airport', dropoffDate: '19 Jul, 18:00', dropoffLoc: 'Heathrow Airport', statusText: 'Pendente' }
+          },
+          // TRIP 5: Bali
+          {
+            id: 'a_bali', type: 'activities', status: 'upcoming', tripName: 'Bali, Indonésia', tripDate: '05 - 15 Set/2024',
+            data: { name: 'Ubud Monkey Forest', date: '07 Set • 10:00 AM', details: '2 Adultos', description: 'Visita guiada à floresta sagrada dos macacos.', statusText: 'Confirmado' }
+          },
+          // TRIP 6: NY (Past)
+          {
+            id: 'f_ny', type: 'flights', status: 'past', tripName: 'Nova York, EUA', tripDate: '01 - 10 Jun/2024',
+            data: { origin: 'São Paulo', dest: 'Nova York', originCode: 'GRU', destCode: 'JFK', flightNum: 'DL 106', departureTime: '22:00', departureDate: '01 Jun', arrivalTime: '06:30', arrivalDate: '02 Jun', duration: '9h 30m', isDirect: true, airline: 'Delta', statusText: 'Finalizado' }
+          },
+          // TRIP 7: Cairo (2026)
+          {
+            id: 'a_cairo', type: 'activities', status: 'upcoming', tripName: 'Cairo, Egito', tripDate: '10 - 20 Mar/2026',
+            data: { name: 'Pirâmides de Gizé', date: '12 Mar • 08:00 AM', details: 'Tour Privado', description: 'Exploração completa das pirâmides e esfinge com egiptólogo.', statusText: 'Pré-reserva' }
+          },
+          // TRIP 8: Sidney (2026)
+          {
+            id: 'f_sidney', type: 'flights', status: 'upcoming', tripName: 'Sidney, Austrália', tripDate: '15 - 30 Nov/2026',
+            data: { origin: 'Santiago', dest: 'Sydney', originCode: 'SCL', destCode: 'SYD', flightNum: 'QF 28', departureTime: '13:30', departureDate: '15 Nov', arrivalTime: '17:50', arrivalDate: '16 Nov', duration: '14h 20m', isDirect: true, airline: 'Qantas', statusText: 'Pendente' }
+          }
+        ];
+        
+        setBookings(initialBookings);
+        localStorage.setItem('travelease_bookings', JSON.stringify(initialBookings));
+    } else {
+        setBookings(savedBookings);
     }
-  ];
+
+  }, []);
 
   // Logic to Filter
-  const filteredBookings = allBookings.filter(item => {
+  const filteredBookings = bookings.filter(item => {
     const matchesTab = item.status === activeTab;
     const matchesFilter = activeFilter === 'all' || item.type === activeFilter;
-    return matchesTab && matchesFilter;
+    
+    let matchesSearch = true;
+    if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const d = item.data;
+        matchesSearch = (
+            (item.tripName && item.tripName.toLowerCase().includes(query)) ||
+            (d.name && d.name.toLowerCase().includes(query)) ||
+            (d.origin && d.origin.toLowerCase().includes(query)) ||
+            (d.dest && d.dest.toLowerCase().includes(query))
+        );
+    }
+
+    return matchesTab && matchesFilter && matchesSearch;
   });
 
-  // Agrupar por viagem para manter o layout "Viagem para Paris"
+  // Agrupar por viagem
   const groupedBookings: Record<string, BookingItem[]> = {};
   filteredBookings.forEach(item => {
     if (!groupedBookings[item.tripName]) {
@@ -156,11 +121,9 @@ const BookingsScreen: React.FC = () => {
 
   // Handlers
   const handleBack = () => {
-    // Se tiver ID, volta para a tela de detalhes daquela viagem específica
     if (id) {
       navigate(`/trip/${id}`);
     } else {
-      // Se estiver na tela global, volta para home
       navigate('/home');
     }
   };
@@ -182,30 +145,46 @@ const BookingsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-[#F6F7F8] dark:bg-background-dark animate-slide-up relative">
-      {/* HEADER - Ajustado conforme imagem anexa (Estilo Orçamento Global) */}
+      {/* HEADER */}
       <header className="flex items-center justify-between bg-white dark:bg-surface-dark px-4 py-3 sticky top-0 z-20 shadow-sm border-b border-gray-100 dark:border-gray-800">
         <button onClick={handleBack} className="flex size-7 items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
           <span className="material-symbols-outlined text-[24px]">arrow_back</span>
         </button>
         <h2 className="text-[16px] font-bold leading-tight flex-1 text-center text-[#111418] dark:text-white">Reservas</h2>
-        <button className="flex size-7 items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
-          <span className="material-symbols-outlined text-[24px]">tune</span>
-        </button>
+        <div className="flex items-center gap-1">
+            <button onClick={() => { setShowSearch(!showSearch); if(showSearch) setSearchQuery(''); }} className={`flex size-8 items-center justify-center rounded-full transition-colors ${showSearch ? 'bg-primary text-white' : 'hover:bg-gray-100'}`}>
+                <span className="material-symbols-outlined text-[22px]">search</span>
+            </button>
+            <button onClick={() => setShowFilters(!showFilters)} className={`flex size-8 items-center justify-center rounded-full transition-colors ${!showFilters ? 'bg-gray-100' : 'bg-primary text-white'}`}>
+                <span className="material-symbols-outlined text-[22px]">tune</span>
+            </button>
+        </div>
       </header>
 
-      {/* SEARCH E FILTROS */}
       <div className="bg-white dark:bg-surface-dark px-4 pb-2 pt-2 border-b border-gray-100 dark:border-gray-800 sticky top-[53px] z-10">
-        <div className="relative mb-3">
-          <div className="absolute left-3 top-2.5 text-gray-400">
-            <span className="material-symbols-outlined text-[20px]">search</span>
-          </div>
-          <input 
-            type="text" 
-            placeholder="Buscar hotel, voo ou atividade" 
-            className="w-full h-10 pl-10 pr-4 bg-gray-100 dark:bg-gray-800 rounded-xl text-[13px] outline-none font-medium placeholder-gray-400 focus:ring-2 ring-primary/20 transition-all"
-          />
-        </div>
+        {/* SEARCH BAR (CONDITIONAL) */}
+        {showSearch && (
+            <div className="relative mb-3 animate-fade-in">
+                <div className="absolute left-3 top-2.5 text-gray-400">
+                    <span className="material-symbols-outlined text-[20px]">search</span>
+                </div>
+                <input 
+                    type="text" 
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar reserva..." 
+                    className="w-full h-10 pl-10 pr-10 bg-gray-100 dark:bg-gray-800 rounded-xl text-[13px] outline-none font-medium placeholder-gray-400 focus:ring-2 ring-primary/20 transition-all"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                    <span className="material-symbols-outlined text-[20px]">close</span>
+                  </button>
+                )}
+            </div>
+        )}
 
+        {/* TABS */}
         <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl flex mb-3">
           {[
             { id: 'upcoming', label: 'Próximas' },
@@ -222,27 +201,30 @@ const BookingsScreen: React.FC = () => {
           ))}
         </div>
 
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {[
-            { id: 'all', label: 'Todos', icon: '' },
-            { id: 'flights', label: 'Voos', icon: 'flight' },
-            { id: 'hotels', label: 'Hotéis', icon: 'hotel' },
-            { id: 'cars', label: 'Carros', icon: 'directions_car' }
-          ].map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => setActiveFilter(filter.id)}
-              className={`flex items-center gap-1.5 h-9 px-4 rounded-full border text-[12px] font-bold whitespace-nowrap transition-colors ${
-                activeFilter === filter.id 
-                  ? 'bg-primary border-primary text-white' 
-                  : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-gray-700 text-[#111418] dark:text-white'
-              }`}
-            >
-              {filter.icon && <span className="material-symbols-outlined text-[16px]">{filter.icon}</span>}
-              {filter.label}
-            </button>
-          ))}
-        </div>
+        {/* FILTERS (CONDITIONAL) */}
+        {showFilters && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 animate-fade-in">
+            {[
+                { id: 'all', label: 'Todos', icon: '' },
+                { id: 'flights', label: 'Voos', icon: 'flight' },
+                { id: 'hotels', label: 'Hotéis', icon: 'hotel' },
+                { id: 'cars', label: 'Carros', icon: 'directions_car' }
+            ].map((filter) => (
+                <button
+                key={filter.id}
+                onClick={() => setActiveFilter(filter.id)}
+                className={`flex items-center gap-1.5 h-9 px-4 rounded-full border text-[12px] font-bold whitespace-nowrap transition-colors ${
+                    activeFilter === filter.id 
+                    ? 'bg-primary border-primary text-white' 
+                    : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-gray-700 text-[#111418] dark:text-white'
+                }`}
+                >
+                {filter.icon && <span className="material-symbols-outlined text-[16px]">{filter.icon}</span>}
+                {filter.label}
+                </button>
+            ))}
+            </div>
+        )}
       </div>
 
       <main className="flex-1 overflow-y-auto px-4 pb-24 no-scrollbar pt-4 space-y-6">
@@ -320,7 +302,7 @@ const BookingsScreen: React.FC = () => {
                                <h4 className="text-[13px] font-bold text-[#111418] dark:text-white leading-tight">{d.name}</h4>
                                <div className="flex items-center gap-1 mt-1">
                                   <span className="material-symbols-outlined text-yellow-400 text-[12px] material-symbols-filled">star</span>
-                                  <span className="text-[10px] text-gray-400 font-medium">{d.rating} ({d.reviews} reviews)</span>
+                                  <span className="text-[10px] text-gray-400 font-medium">{d.rating ? `${d.rating} (${d.reviews} reviews)` : 'Novo'}</span>
                                </div>
                             </div>
                          </div>

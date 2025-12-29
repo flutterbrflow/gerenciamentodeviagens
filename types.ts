@@ -1,4 +1,11 @@
 
+export interface Traveler {
+  id: string;
+  name: string;
+  image: string;
+  isMe?: boolean;
+}
+
 export interface Trip {
   id: string;
   destination: string;
@@ -8,6 +15,8 @@ export interface Trip {
   status: 'upcoming' | 'past' | 'planning';
   daysLeft?: number;
   timeframe?: string;
+  travelers?: Traveler[];
+  mediaCount?: number;
 }
 
 export interface TimelineEvent {

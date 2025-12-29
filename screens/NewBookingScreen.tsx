@@ -25,7 +25,64 @@ const NewBookingScreen: React.FC = () => {
 
   const handleSave = () => {
     setLoading(true);
-    // Simulação de salvamento
+    
+    // Simular construção do objeto de reserva
+    let newBooking: any = {
+      id: Date.now().toString(),
+      status: 'upcoming',
+      tripName: 'Nova Viagem', // Em um app real, o usuário selecionaria a viagem
+      tripDate: 'Em breve',
+      data: {
+         statusText: 'Confirmado'
+      }
+    };
+
+    if (activeType === 'flight') {
+        newBooking.type = 'flights';
+        newBooking.data = {
+            ...newBooking.data,
+            origin: formData.origin || 'Origem',
+            dest: formData.destination || 'Destino',
+            originCode: formData.originCode || formData.origin?.substring(0,3).toUpperCase() || 'ORG',
+            destCode: formData.destCode || formData.destination?.substring(0,3).toUpperCase() || 'DST',
+            flightNum: formData.flightNum || 'VOO 000',
+            departureTime: formData.startTime || '00:00',
+            departureDate: formData.startDate || 'Data',
+            arrivalTime: formData.endTime || '00:00',
+            arrivalDate: formData.endDate || 'Data',
+            duration: 'Calculando...',
+            isDirect: true,
+            airline: formData.airline || 'Companhia'
+        };
+    } else if (activeType === 'hotel') {
+        newBooking.type = 'hotels';
+        newBooking.data = {
+            ...newBooking.data,
+            name: formData.hotelName || 'Novo Hotel',
+            checkIn: `${formData.startDate || 'Data'}, ${formData.startTime || '14:00'}`,
+            checkOut: `${formData.endDate || 'Data'}, ${formData.endTime || '11:00'}`,
+            image: 'hotel',
+            rating: 0,
+            reviews: 0
+        };
+    } else if (activeType === 'car') {
+        newBooking.type = 'cars';
+        newBooking.data = {
+            ...newBooking.data,
+            name: formData.rentalCompany || 'Locadora',
+            model: formData.carModel || 'Carro',
+            pickupDate: `${formData.startDate || 'Data'}, ${formData.startTime || '00:00'}`,
+            pickupLoc: formData.pickupLoc || 'Local de Retirada',
+            dropoffDate: `${formData.endDate || 'Data'}, ${formData.endTime || '00:00'}`,
+            dropoffLoc: formData.dropoffLoc || 'Local de Devolução'
+        };
+    }
+
+    // Salvar no LocalStorage
+    const savedBookings = JSON.parse(localStorage.getItem('travelease_bookings') || '[]');
+    savedBookings.unshift(newBooking); // Adiciona no início
+    localStorage.setItem('travelease_bookings', JSON.stringify(savedBookings));
+
     setTimeout(() => {
       setLoading(false);
       navigate(-1);
@@ -34,13 +91,14 @@ const NewBookingScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-background-light dark:bg-background-dark animate-fade-in">
-      {/* Header */}
-      <div className="sticky top-0 z-20 flex items-center bg-white dark:bg-surface-dark p-4 shadow-sm">
-        <button onClick={() => navigate(-1)} className="flex items-center justify-center size-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition-colors">
-           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+      {/* Header Padronizado com BookingsScreen */}
+      <header className="flex items-center justify-between bg-white dark:bg-surface-dark px-4 py-3 sticky top-0 z-20 shadow-sm border-b border-gray-100 dark:border-gray-800">
+        <button onClick={() => navigate(-1)} className="flex size-7 items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
+          <span className="material-symbols-outlined text-[24px]">arrow_back</span>
         </button>
-        <h2 className="text-[#111418] dark:text-white text-[16px] font-bold flex-1 text-center pr-9">Nova Reserva</h2>
-      </div>
+        <h2 className="text-[16px] font-bold leading-tight flex-1 text-center text-[#111418] dark:text-white">Nova Reserva</h2>
+        <div className="size-7"></div> {/* Espaçador para centralizar */}
+      </header>
 
       <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
         {/* Type Selector */}

@@ -1,10 +1,48 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Estados
+  const [profileImage, setProfileImage] = useState("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [activeModal, setActiveModal] = useState<'none' | 'privacy' | 'language' | 'settings'>('none');
+  const [language, setLanguage] = useState('Português');
+
+  useEffect(() => {
+    // Check initial dark mode
+    if (document.documentElement.classList.contains('dark')) {
+      setDarkMode(true);
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    if (darkMode) {
+      document.documentElement.classList.remove('dark');
+      setDarkMode(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      setDarkMode(true);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setProfileImage(imageUrl);
+    }
+  };
+
+  const handleLogout = () => {
+    // Aqui limparia o auth token se houvesse
+    navigate('/');
+  };
 
   const stats = [
     { label: 'Viagens', value: '12', icon: 'explore' },
@@ -13,17 +51,34 @@ const ProfileScreen: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-background-light dark:bg-background-dark animate-fade-in">
-      <header className="flex items-center justify-between px-4 py-3 bg-surface-light dark:bg-surface-dark border-b border-gray-100 dark:border-gray-800">
-        <h2 className="text-[16px] font-bold">Meu Perfil</h2>
-        <button className="p-2 rounded-full hover:bg-gray-100 transition-colors"><span className="material-symbols-outlined text-[20px]">settings</span></button>
+    <div className="flex flex-col h-full bg-background-light dark:bg-background-dark animate-fade-in relative">
+      <header className="flex items-center justify-between px-4 py-3 bg-surface-light dark:bg-surface-dark border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+        <button onClick={() => navigate('/home')} className="flex size-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+        </button>
+        <h2 className="text-[16px] font-bold flex-1 text-center">Meu Perfil</h2>
+        <button onClick={() => setActiveModal('settings')} className="flex size-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <span className="material-symbols-outlined text-[24px]">settings</span>
+        </button>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24 no-scrollbar">
         <div className="flex flex-col items-center py-8 px-4 bg-surface-light dark:bg-surface-dark">
           <div className="relative">
-            <div className="size-24 rounded-full border-4 border-primary/20 bg-cover bg-center shadow-lg" style={{ backgroundImage: `url("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200")` }}></div>
-            <button className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full border-2 border-white shadow-md"><span className="material-symbols-outlined text-[15px]">edit</span></button>
+            <div className="size-24 rounded-full border-4 border-primary/20 bg-cover bg-center shadow-lg" style={{ backgroundImage: `url("${profileImage}")` }}></div>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full border-2 border-white dark:border-[#1e2a36] shadow-md hover:bg-blue-600 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[15px]">edit</span>
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImageUpload} 
+              accept="image/*" 
+              className="hidden" 
+            />
           </div>
           <h3 className="mt-4 text-[19px] font-bold text-[#111418] dark:text-white">Alex Silva</h3>
           <p className="text-gray-500 font-bold text-[11px] uppercase tracking-tight">Viajante Enthusiasta • @alex_travels</p>
@@ -42,32 +97,113 @@ const ProfileScreen: React.FC = () => {
         <div className="px-4 py-2 space-y-3">
           <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Preferências</h4>
           <div className="bg-white dark:bg-[#1e2a36] rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800">
-            {[
-              { label: 'Notificações', icon: 'notifications', toggle: true },
-              { label: 'Modo Escuro', icon: 'dark_mode', toggle: true },
-              { label: 'Privacidade', icon: 'lock', toggle: false },
-              { label: 'Idioma', icon: 'language', value: 'Português', toggle: false },
-            ].map((item, idx) => (
-              <div key={item.label} className={`flex items-center justify-between p-4 active:bg-gray-50 transition-colors ${idx !== 0 ? 'border-t border-gray-50 dark:border-gray-800' : ''}`}>
-                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">{item.icon}</span><span className="font-semibold text-[13px]">{item.label}</span></div>
-                {item.toggle ? (
-                  <div className="w-9 h-5 bg-primary/20 rounded-full relative"><div className="absolute top-0.5 left-4.5 w-4 h-4 bg-primary rounded-full"></div></div>
-                ) : item.value ? (
-                  <span className="text-[10px] font-bold text-primary uppercase">{item.value}</span>
-                ) : (
-                  <span className="material-symbols-outlined text-gray-300 text-[18px]">chevron_right</span>
-                )}
-              </div>
-            ))}
+            
+            {/* Notificações */}
+            <div 
+              onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+              className="flex items-center justify-between p-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors cursor-pointer"
+            >
+                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">notifications</span><span className="font-semibold text-[13px]">Notificações</span></div>
+                <div className={`w-9 h-5 rounded-full relative transition-colors ${notificationsEnabled ? 'bg-primary/20' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-300 ${notificationsEnabled ? 'left-4.5 bg-primary' : 'left-0.5 bg-gray-400'}`}></div>
+                </div>
+            </div>
+
+            {/* Modo Escuro */}
+            <div 
+              onClick={toggleDarkMode}
+              className="flex items-center justify-between p-4 border-t border-gray-50 dark:border-gray-800 active:bg-gray-50 dark:active:bg-gray-800 transition-colors cursor-pointer"
+            >
+                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">dark_mode</span><span className="font-semibold text-[13px]">Modo Escuro</span></div>
+                <div className={`w-9 h-5 rounded-full relative transition-colors ${darkMode ? 'bg-primary/20' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-300 ${darkMode ? 'left-4.5 bg-primary' : 'left-0.5 bg-gray-400'}`}></div>
+                </div>
+            </div>
+
+            {/* Privacidade */}
+            <div 
+              onClick={() => setActiveModal('privacy')}
+              className="flex items-center justify-between p-4 border-t border-gray-50 dark:border-gray-800 active:bg-gray-50 dark:active:bg-gray-800 transition-colors cursor-pointer"
+            >
+                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">lock</span><span className="font-semibold text-[13px]">Privacidade</span></div>
+                <span className="material-symbols-outlined text-gray-300 text-[18px]">chevron_right</span>
+            </div>
+
+            {/* Idioma */}
+            <div 
+              onClick={() => setActiveModal('language')}
+              className="flex items-center justify-between p-4 border-t border-gray-50 dark:border-gray-800 active:bg-gray-50 dark:active:bg-gray-800 transition-colors cursor-pointer"
+            >
+                <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">language</span><span className="font-semibold text-[13px]">Idioma</span></div>
+                <span className="text-[10px] font-bold text-primary uppercase">{language}</span>
+            </div>
+
           </div>
         </div>
 
         <div className="px-4 py-6">
-           <button onClick={() => navigate('/')} className="w-full bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:bg-red-100 transition-colors text-[13px]">
+           <button onClick={handleLogout} className="w-full bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:bg-red-100 transition-colors text-[13px]">
              <span className="material-symbols-outlined text-[20px]">logout</span> Sair da Conta
            </button>
         </div>
       </main>
+
+      {/* GENERIC MODAL */}
+      {activeModal !== 'none' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-3xl p-6 shadow-2xl animate-slide-up relative">
+             <button onClick={() => setActiveModal('none')} className="absolute top-4 right-4 z-10 size-8 bg-black/5 dark:bg-white/10 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors">
+               <span className="material-symbols-outlined text-[18px]">close</span>
+             </button>
+
+             {activeModal === 'settings' && (
+                 <>
+                    <h3 className="text-[18px] font-bold mb-4">Configurações</h3>
+                    <p className="text-gray-500 text-sm mb-4">Configurações avançadas do aplicativo estariam aqui.</p>
+                    <button onClick={() => setActiveModal('none')} className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm">OK</button>
+                 </>
+             )}
+
+             {activeModal === 'privacy' && (
+                 <>
+                    <h3 className="text-[18px] font-bold mb-4">Privacidade</h3>
+                    <div className="space-y-3 mb-6">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm">Perfil Público</span>
+                            <div className="w-9 h-5 bg-primary rounded-full relative"><div className="absolute top-0.5 right-0.5 w-4 h-4 bg-white rounded-full"></div></div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm">Compartilhar localização</span>
+                            <div className="w-9 h-5 bg-gray-200 rounded-full relative"><div className="absolute top-0.5 left-0.5 w-4 h-4 bg-gray-400 rounded-full"></div></div>
+                        </div>
+                    </div>
+                    <button onClick={() => setActiveModal('none')} className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm">Salvar</button>
+                 </>
+             )}
+
+             {activeModal === 'language' && (
+                 <>
+                    <h3 className="text-[18px] font-bold mb-4">Selecione o Idioma</h3>
+                    <div className="space-y-2 mb-6">
+                        {['Português', 'English', 'Español', 'Français'].map(lang => (
+                            <button 
+                                key={lang} 
+                                onClick={() => setLanguage(lang)}
+                                className={`w-full p-3 rounded-xl text-left font-medium flex justify-between ${language === lang ? 'bg-primary/10 text-primary' : 'bg-gray-50 dark:bg-gray-800'}`}
+                            >
+                                {lang}
+                                {language === lang && <span className="material-symbols-outlined">check</span>}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => setActiveModal('none')} className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm">Confirmar</button>
+                 </>
+             )}
+
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   );
