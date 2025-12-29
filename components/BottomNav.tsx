@@ -8,6 +8,7 @@ const BottomNav: React.FC = () => {
 
   const navItems = [
     { label: 'Viagens', icon: 'airplane_ticket', path: '/home' },
+    { label: 'Reservas', icon: 'confirmation_number', path: '/bookings' },
     { label: 'Memórias', icon: 'photo_library', path: '/memories' },
     { label: 'Orçamento', icon: 'payments', path: '/budget' },
     { label: 'Perfil', icon: 'person', path: '/profile' },
@@ -22,14 +23,14 @@ const BottomNav: React.FC = () => {
             <button
               key={item.label}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center gap-1 w-16 transition-all duration-200 ${
+              className={`flex flex-col items-center justify-center gap-1 w-14 transition-all duration-200 ${
                 isActive ? 'text-primary scale-110' : 'text-[#9ba8b8] hover:text-gray-600 dark:hover:text-gray-400'
               }`}
             >
-              <span className={`material-symbols-outlined text-[26px] ${isActive ? 'material-symbols-filled' : ''}`}>
+              <span className={`material-symbols-outlined text-[24px] ${isActive ? 'material-symbols-filled' : ''}`}>
                 {item.icon}
               </span>
-              <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>
+              <span className={`text-[9px] ${isActive ? 'font-bold' : 'font-medium'}`}>
                 {item.label}
               </span>
             </button>

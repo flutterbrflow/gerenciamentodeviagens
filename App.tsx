@@ -8,6 +8,8 @@ import NewTripScreen from './screens/NewTripScreen';
 import BudgetScreen from './screens/BudgetScreen';
 import MemoriesScreen from './screens/MemoriesScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import BookingsScreen from './screens/BookingsScreen';
+import NewBookingScreen from './screens/NewBookingScreen';
 
 const App: React.FC = () => {
   return (
@@ -18,7 +20,10 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<OnboardingScreen />} />
             <Route path="/home" element={<HomeScreen />} />
+            <Route path="/bookings" element={<BookingsScreen />} />
+            <Route path="/new-booking" element={<NewBookingScreen />} />
             <Route path="/trip/:id" element={<TripDetailsScreen />} />
+            <Route path="/trip/:id/bookings" element={<BookingsScreen />} />
             <Route path="/new-trip" element={<NewTripScreen />} />
             <Route path="/budget" element={<BudgetScreen />} />
             <Route path="/memories" element={<MemoriesScreen />} />

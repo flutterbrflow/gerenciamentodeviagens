@@ -15,8 +15,9 @@ export interface TimelineEvent {
   time: string;
   title: string;
   description: string;
-  type: 'flight' | 'hotel' | 'activity' | 'dinner';
+  type: 'flight' | 'hotel' | 'activity' | 'dinner' | 'transport' | 'leisure' | 'shopping' | 'museum' | 'coffee' | 'bar';
   status?: string;
+  statusLabel?: string;
   location?: string;
   mapUrl?: string;
 }
