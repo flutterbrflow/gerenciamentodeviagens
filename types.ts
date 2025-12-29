@@ -17,6 +17,7 @@ export interface Trip {
   timeframe?: string;
   travelers?: Traveler[];
   mediaCount?: number;
+  notes?: string;
 }
 
 export interface TimelineEvent {
@@ -24,7 +25,7 @@ export interface TimelineEvent {
   time: string;
   title: string;
   description: string;
-  type: 'flight' | 'hotel' | 'activity' | 'dinner' | 'transport' | 'leisure' | 'shopping' | 'museum' | 'coffee' | 'bar';
+  type: 'flight' | 'hotel' | 'activity' | 'dinner' | 'transport' | 'leisure' | 'shopping' | 'museum' | 'coffee' | 'bar' | 'church' | 'park';
   status?: string;
   statusLabel?: string;
   location?: string;

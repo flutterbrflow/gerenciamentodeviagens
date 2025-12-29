@@ -34,6 +34,16 @@ const HomeScreen: React.FC = () => {
           status: 'upcoming',
           mediaCount: 45
         },
+        // Nova Viagem Brasília com imagem real
+        {
+          id: '30',
+          destination: 'Brasília, Brasil',
+          country: 'Brasil',
+          dateRange: '10 Fev - 15 Fev, 2025',
+          imageUrl: 'https://images.unsplash.com/photo-1555881400-74d7acaacd81?auto=format&fit=crop&q=80&w=800',
+          status: 'upcoming',
+          mediaCount: 12
+        },
         {
           id: '3',
           destination: 'Rio de Janeiro, Brasil',
@@ -68,7 +78,6 @@ const HomeScreen: React.FC = () => {
           status: 'past',
           mediaCount: 342
         },
-        // Novas Viagens 2026
         {
           id: '7',
           destination: 'Cairo, Egito',
@@ -106,19 +115,28 @@ const HomeScreen: React.FC = () => {
         
         const dayStart = parseInt(parts[1]);
         const monthStart = monthsMap[parts[2]];
+        const dayEnd = parseInt(parts[3]);
+        const monthEnd = monthsMap[parts[4]];
         const year = parseInt(parts[5]);
 
         const startDate = new Date(year, monthStart, dayStart);
+        const endDate = new Date(year, monthEnd, dayEnd);
         const today = new Date();
         
         // Zera horas para comparação de dias apenas
         startDate.setHours(0,0,0,0);
+        endDate.setHours(0,0,0,0);
         today.setHours(0,0,0,0);
 
         const diffTime = startDate.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Duração total da viagem em dias
+        const durationTime = Math.abs(endDate.getTime() - startDate.getTime());
+        const durationDays = Math.ceil(durationTime / (1000 * 60 * 60 * 24)) + 1;
 
-        if (diffDays < 0) return "Em andamento"; // ou Finalizada se já passou o fim, simplificado aqui
+        if (today > endDate) return "Finalizada";
+        if (today >= startDate && today <= endDate) return `${durationDays} dias`; // Mostra duração total se estiver em andamento
         if (diffDays === 0) return "É hoje!";
         if (diffDays <= 60) return `Faltam ${diffDays} dias`;
         

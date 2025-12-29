@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
+import { Trip } from '../types';
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -13,12 +14,31 @@ const ProfileScreen: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [activeModal, setActiveModal] = useState<'none' | 'privacy' | 'language' | 'settings'>('none');
   const [language, setLanguage] = useState('Português');
+  
+  // Estados de Privacidade
+  const [publicProfile, setPublicProfile] = useState(true);
+  const [shareLocation, setShareLocation] = useState(false);
+
+  // Estados de Estatísticas
+  const [stats, setStats] = useState({ trips: '0', countries: '0', photos: '0' });
 
   useEffect(() => {
     // Check initial dark mode
     if (document.documentElement.classList.contains('dark')) {
       setDarkMode(true);
     }
+
+    // Calculate Stats
+    const savedTrips: Trip[] = JSON.parse(localStorage.getItem('travelease_trips') || '[]');
+    const uniqueCountries = new Set(savedTrips.map(t => t.country)).size;
+    const totalMedia = savedTrips.reduce((acc, t) => acc + (t.mediaCount || 0), 0);
+
+    setStats({
+        trips: savedTrips.length.toString(),
+        countries: uniqueCountries.toString(),
+        photos: totalMedia.toString()
+    });
+
   }, []);
 
   const toggleDarkMode = () => {
@@ -44,10 +64,15 @@ const ProfileScreen: React.FC = () => {
     navigate('/');
   };
 
-  const stats = [
-    { label: 'Viagens', value: '12', icon: 'explore' },
-    { label: 'Países', value: '4', icon: 'public' },
-    { label: 'Fotos', value: '248', icon: 'photo_library' },
+  const handleLanguageSelect = (lang: string) => {
+      setLanguage(lang);
+      setActiveModal('none');
+  };
+
+  const statItems = [
+    { label: 'Viagens', value: stats.trips, icon: 'explore' },
+    { label: 'Países', value: stats.countries, icon: 'public' },
+    { label: 'Fotos', value: stats.photos, icon: 'photo_library' },
   ];
 
   return (
@@ -85,7 +110,7 @@ const ProfileScreen: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-3 p-4">
-          {stats.map((stat) => (
+          {statItems.map((stat) => (
             <div key={stat.label} className="bg-white dark:bg-[#1e2a36] p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col items-center gap-1">
               <span className="material-symbols-outlined text-primary text-[20px] mb-1">{stat.icon}</span>
               <span className="text-[15px] font-bold">{stat.value}</span>
@@ -104,8 +129,8 @@ const ProfileScreen: React.FC = () => {
               className="flex items-center justify-between p-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors cursor-pointer"
             >
                 <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">notifications</span><span className="font-semibold text-[13px]">Notificações</span></div>
-                <div className={`w-9 h-5 rounded-full relative transition-colors ${notificationsEnabled ? 'bg-primary/20' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-300 ${notificationsEnabled ? 'left-4.5 bg-primary' : 'left-0.5 bg-gray-400'}`}></div>
+                <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${notificationsEnabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200 ${notificationsEnabled ? 'left-5' : 'left-1'}`}></div>
                 </div>
             </div>
 
@@ -115,8 +140,8 @@ const ProfileScreen: React.FC = () => {
               className="flex items-center justify-between p-4 border-t border-gray-50 dark:border-gray-800 active:bg-gray-50 dark:active:bg-gray-800 transition-colors cursor-pointer"
             >
                 <div className="flex items-center gap-3"><span className="material-symbols-outlined text-gray-500 text-[20px]">dark_mode</span><span className="font-semibold text-[13px]">Modo Escuro</span></div>
-                <div className={`w-9 h-5 rounded-full relative transition-colors ${darkMode ? 'bg-primary/20' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-300 ${darkMode ? 'left-4.5 bg-primary' : 'left-0.5 bg-gray-400'}`}></div>
+                <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${darkMode ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200 ${darkMode ? 'left-5' : 'left-1'}`}></div>
                 </div>
             </div>
 
@@ -167,14 +192,18 @@ const ProfileScreen: React.FC = () => {
              {activeModal === 'privacy' && (
                  <>
                     <h3 className="text-[18px] font-bold mb-4">Privacidade</h3>
-                    <div className="space-y-3 mb-6">
-                        <div className="flex items-center justify-between">
+                    <div className="space-y-4 mb-6">
+                        <div className="flex items-center justify-between cursor-pointer" onClick={() => setPublicProfile(!publicProfile)}>
                             <span className="text-sm">Perfil Público</span>
-                            <div className="w-9 h-5 bg-primary rounded-full relative"><div className="absolute top-0.5 right-0.5 w-4 h-4 bg-white rounded-full"></div></div>
+                            <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${publicProfile ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200 ${publicProfile ? 'left-5' : 'left-1'}`}></div>
+                            </div>
                         </div>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between cursor-pointer" onClick={() => setShareLocation(!shareLocation)}>
                             <span className="text-sm">Compartilhar localização</span>
-                            <div className="w-9 h-5 bg-gray-200 rounded-full relative"><div className="absolute top-0.5 left-0.5 w-4 h-4 bg-gray-400 rounded-full"></div></div>
+                            <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${shareLocation ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200 ${shareLocation ? 'left-5' : 'left-1'}`}></div>
+                            </div>
                         </div>
                     </div>
                     <button onClick={() => setActiveModal('none')} className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm">Salvar</button>
@@ -188,7 +217,7 @@ const ProfileScreen: React.FC = () => {
                         {['Português', 'English', 'Español', 'Français'].map(lang => (
                             <button 
                                 key={lang} 
-                                onClick={() => setLanguage(lang)}
+                                onClick={() => handleLanguageSelect(lang)}
                                 className={`w-full p-3 rounded-xl text-left font-medium flex justify-between ${language === lang ? 'bg-primary/10 text-primary' : 'bg-gray-50 dark:bg-gray-800'}`}
                             >
                                 {lang}
@@ -196,7 +225,6 @@ const ProfileScreen: React.FC = () => {
                             </button>
                         ))}
                     </div>
-                    <button onClick={() => setActiveModal('none')} className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm">Confirmar</button>
                  </>
              )}
 

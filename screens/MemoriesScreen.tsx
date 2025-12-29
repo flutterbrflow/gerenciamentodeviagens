@@ -23,10 +23,14 @@ const MemoriesScreen: React.FC = () => {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
 
+  // Estado Modal Visualização
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+
   const memories: Memory[] = [
     { id: 'm1', type: 'photo', url: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=400', location: 'Paris, França', date: 'Hoje', itemsCount: 124 },
     { id: 'm2', type: 'photo', url: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=400', location: 'Tóquio, Japão', date: 'Ontem', itemsCount: 45 },
     { id: 'm3', type: 'video', url: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?auto=format&fit=crop&q=80&w=400', location: 'Rio de Janeiro, Brasil', date: '20 Fev', itemsCount: 15 },
+    { id: 'm9', type: 'photo', url: 'https://images.unsplash.com/photo-1555881400-74d7acaacd81?auto=format&fit=crop&q=80&w=400', location: 'Brasília, Brasil', date: '12 Fev', itemsCount: 12 },
     { id: 'm4', type: 'photo', url: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80&w=400', location: 'Londres, Reino Unido', date: '12 Jul', itemsCount: 89 },
     { id: 'm5', type: 'photo', url: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&q=80&w=400', location: 'Bali, Indonésia', date: '05 Set', itemsCount: 62 },
     { id: 'm6', type: 'photo', url: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&q=80&w=400', location: 'Nova York, EUA', date: '01 Jun', itemsCount: 342 },
@@ -40,7 +44,8 @@ const MemoriesScreen: React.FC = () => {
       return matchSearch && matchDate;
   });
 
-  const handleShare = async (memory: Memory) => {
+  const handleShare = async (e: React.MouseEvent, memory: Memory) => {
+    e.stopPropagation();
     if (navigator.share) {
       try {
         await navigator.share({ title: `Minha memória em ${memory.location}`, text: `Olha esse lugar incrível!`, url: memory.url });
@@ -117,7 +122,7 @@ const MemoriesScreen: React.FC = () => {
         {filteredMemories.length > 0 ? (
             <div className="columns-2 gap-3 space-y-3">
             {filteredMemories.map((memory) => (
-                <div key={memory.id} className="relative group rounded-2xl overflow-hidden bg-gray-200 dark:bg-gray-800 break-inside-avoid shadow-sm active:scale-[0.98] transition-transform">
+                <div key={memory.id} onClick={() => setSelectedMemory(memory)} className="relative group rounded-2xl overflow-hidden bg-gray-200 dark:bg-gray-800 break-inside-avoid shadow-sm active:scale-[0.98] transition-transform cursor-pointer">
                 <img src={memory.url} alt={memory.location} className="w-full object-cover min-h-[120px]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-100 transition-opacity"></div>
                 
@@ -131,7 +136,7 @@ const MemoriesScreen: React.FC = () => {
 
                 <div className="absolute bottom-0 left-0 p-2.5 w-full">
                     <p className="text-white text-[9px] font-bold truncate">{memory.location}</p>
-                    <div className="flex items-center justify-between mt-1"><p className="text-white/70 text-[7px]">{memory.date}</p><button onClick={() => handleShare(memory)} className="size-5 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"><span className="material-symbols-outlined text-[12px]">share</span></button></div>
+                    <div className="flex items-center justify-between mt-1"><p className="text-white/70 text-[7px]">{memory.date}</p><button onClick={(e) => handleShare(e, memory)} className="size-5 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"><span className="material-symbols-outlined text-[12px]">share</span></button></div>
                 </div>
                 {memory.type === 'video' && <div className="absolute top-2 right-2 size-5 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white"><span className="material-symbols-outlined text-[13px]">videocam</span></div>}
                 </div>
@@ -169,6 +174,21 @@ const MemoriesScreen: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL FULL SCREEN MEMORY */}
+      {selectedMemory && (
+          <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center animate-fade-in">
+              <button onClick={() => setSelectedMemory(null)} className="absolute top-6 right-6 z-10 size-10 bg-black/50 rounded-full flex items-center justify-center text-white backdrop-blur-md">
+                  <span className="material-symbols-outlined text-[24px]">close</span>
+              </button>
+              <img src={selectedMemory.url} className="max-w-full max-h-full object-contain" alt={selectedMemory.location} />
+              <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black/80 to-transparent text-white">
+                  <h3 className="text-lg font-bold">{selectedMemory.location}</h3>
+                  <p className="text-sm opacity-80">{selectedMemory.date} • {selectedMemory.itemsCount} itens</p>
+              </div>
+          </div>
+      )}
+
       <BottomNav />
     </div>
   );
