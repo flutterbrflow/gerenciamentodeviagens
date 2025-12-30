@@ -8,11 +8,16 @@ import {
     SafeAreaView,
 } from 'react-native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { MainTabParamList } from '../types';
+import { MainTabParamList, RootStackParamList } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type BookingsNavigationProp = BottomTabNavigationProp<MainTabParamList, 'Bookings'>;
+type BookingsNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, 'Bookings'>,
+    NativeStackNavigationProp<RootStackParamList>
+>;
 
 interface Props {
     navigation: BookingsNavigationProp;
@@ -75,7 +80,10 @@ const BookingsScreen: React.FC<Props> = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Minhas Reservas</Text>
-                <TouchableOpacity style={styles.addButton}>
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => navigation.navigate('NewBooking')}
+                >
                     <MaterialIcons name="add" size={24} color="#137fec" />
                 </TouchableOpacity>
             </View>
@@ -87,7 +95,11 @@ const BookingsScreen: React.FC<Props> = ({ navigation }) => {
             >
                 {bookings.length > 0 ? (
                     bookings.map(booking => (
-                        <View key={booking.id} style={styles.bookingCard}>
+                        <TouchableOpacity
+                            key={booking.id}
+                            style={styles.bookingCard}
+                            onPress={() => navigation.navigate('NewBooking', { booking })}
+                        >
                             <View style={styles.iconContainer}>
                                 <MaterialIcons
                                     name={booking.type === 'flight' ? 'flight' : 'hotel'}
@@ -105,7 +117,7 @@ const BookingsScreen: React.FC<Props> = ({ navigation }) => {
                             <TouchableOpacity style={styles.detailsButton}>
                                 <MaterialIcons name="chevron-right" size={20} color="#9ca3af" />
                             </TouchableOpacity>
-                        </View>
+                        </TouchableOpacity>
                     ))
                 ) : (
                     <View style={styles.emptyContainer}>

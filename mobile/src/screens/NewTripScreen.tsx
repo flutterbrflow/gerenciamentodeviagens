@@ -235,7 +235,7 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                             key="start-date-picker"
                             value={startDate || new Date()}
                             mode="date"
-                            display="default"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                             onChange={handleStartDateChange}
                             minimumDate={new Date()}
                             locale="pt-BR"
@@ -247,7 +247,7 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                             key={`end-date-picker-${startDate.getTime()}`}
                             value={endDate || new Date(startDate.getTime() + 24 * 60 * 60 * 1000)}
                             mode="date"
-                            display="default"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                             onChange={handleEndDateChange}
                             minimumDate={startDate}
                             locale="pt-BR"

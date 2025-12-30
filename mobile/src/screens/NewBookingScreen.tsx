@@ -8,23 +8,49 @@ import {
     StyleSheet,
     SafeAreaView,
     Alert,
+    Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 type NewBookingNavigationProp = NativeStackNavigationProp<RootStackParamList, 'NewBooking'>;
 
+import { RouteProp } from '@react-navigation/native';
+
+type NewBookingRouteProp = RouteProp<RootStackParamList, 'NewBooking'>;
+
 interface Props {
     navigation: NewBookingNavigationProp;
+    route: NewBookingRouteProp;
 }
 
-const NewBookingScreen: React.FC<Props> = ({ navigation }) => {
-    const [bookingName, setBookingName] = useState('');
-    const [reference, setReference] = useState('');
-    const [date, setDate] = useState('');
-    const [bookingType, setBookingType] = useState<'flight' | 'hotel'>('flight');
+const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
+    const editingBooking = route.params?.booking;
+
+    const [bookingName, setBookingName] = useState(editingBooking?.data?.name || editingBooking?.tripName || '');
+    const [reference, setReference] = useState(editingBooking?.data?.ref || '');
+
+    // Parse initial date if exists
+    const initialDate = editingBooking?.data?.date || editingBooking?.data?.checkIn;
+    const [date, setDate] = useState<Date>(initialDate ? new Date(initialDate) : new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
+
+    const [bookingType, setBookingType] = useState<'flight' | 'hotel'>(editingBooking?.type as 'flight' | 'hotel' || 'flight');
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+        }
+        if (selectedDate) {
+            setDate(selectedDate);
+            if (Platform.OS === 'ios') {
+                setShowDatePicker(false);
+            }
+        }
+    };
 
     const handleSave = async () => {
         if (!bookingName.trim()) {
@@ -33,22 +59,26 @@ const NewBookingScreen: React.FC<Props> = ({ navigation }) => {
         }
 
         const newBooking = {
-            id: Date.now().toString(),
-            tripName: 'Nova Viagem',
+            id: editingBooking ? editingBooking.id : Date.now().toString(),
+            tripName: 'Nova Viagem', // Simplified for now
             type: bookingType,
             data: {
                 name: bookingName.trim(),
                 ref: reference.trim() || 'N/A',
-                date: date.trim() || 'A confirmar',
+                date: date.toLocaleDateString('pt-BR'), // Save as string formatted
             },
         };
 
         const saved = await AsyncStorage.getItem('travelease_bookings');
-        const bookings = saved ? JSON.parse(saved) : [];
-        await AsyncStorage.setItem(
-            'travelease_bookings',
-            JSON.stringify([newBooking, ...bookings])
-        );
+        let bookings = saved ? JSON.parse(saved) : [];
+
+        if (editingBooking) {
+            bookings = bookings.map((b: any) => b.id === editingBooking.id ? newBooking : b);
+        } else {
+            bookings = [newBooking, ...bookings];
+        }
+
+        await AsyncStorage.setItem('travelease_bookings', JSON.stringify(bookings));
 
         navigation.goBack();
     };
@@ -145,15 +175,24 @@ const NewBookingScreen: React.FC<Props> = ({ navigation }) => {
                 {/* Date Input */}
                 <View style={styles.section}>
                     <Text style={styles.label}>Data</Text>
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Ex: 15 Dez, 2024"
+                    <TouchableOpacity
+                        style={styles.inputContainer}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Text style={[styles.input, { color: '#111418' }]}>
+                            {date.toLocaleDateString('pt-BR')}
+                        </Text>
+                        <MaterialIcons name="calendar-today" size={20} color="#137fec" style={{ marginRight: 8 }} />
+                    </TouchableOpacity>
+                    {showDatePicker && (
+                        <DateTimePicker
                             value={date}
-                            onChangeText={setDate}
-                            placeholderTextColor="#9ca3af"
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            onChange={onDateChange}
+                            locale="pt-BR"
                         />
-                    </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>

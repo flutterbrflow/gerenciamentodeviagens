@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList, TabType, TimelineEvent, Trip } from '../types';
-import { TripsStorage } from '../utils/storage';
+import { RootStackParamList, TabType, TimelineEvent, Trip, Task, Booking, Expense, BookingType, ExpenseCategory } from '../types';
+import { TripsStorage, TasksStorage, BookingsStorage, ExpensesStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -29,21 +29,21 @@ interface Props {
     route: TripDetailsRouteProp;
 }
 
-interface Task {
-    id: number;
-    text: string;
-    completed: boolean;
-}
+// Task type is now imported from ../types
+
 
 const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const { id } = route.params;
     const [activeTab, setActiveTab] = useState<TabType>('itinerary');
     const [tripData, setTripData] = useState<Trip | null>(null);
     const [tripEvents, setTripEvents] = useState<TimelineEvent[]>([]);
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [bookingsList, setBookingsList] = useState<any[]>([]);
 
-    // Edit Modal States
+    // Feature States
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [bookingsList, setBookingsList] = useState<Booking[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+
+    // Edit Trip Modal States
     const [showEditModal, setShowEditModal] = useState(false);
     const [editDestination, setEditDestination] = useState('');
     const [editNotes, setEditNotes] = useState('');
@@ -52,9 +52,48 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
+    // Feature Modals State
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [newTaskText, setNewTaskText] = useState('');
+
+    const [showBookingModal, setShowBookingModal] = useState(false);
+    const [newBookingType, setNewBookingType] = useState<BookingType>('flight');
+    const [newBookingProvider, setNewBookingProvider] = useState('');
+    const [newBookingRef, setNewBookingRef] = useState('');
+    const [newBookingDate, setNewBookingDate] = useState(new Date());
+    const [showBookingDatePicker, setShowBookingDatePicker] = useState(false);
+
+    const [showExpenseModal, setShowExpenseModal] = useState(false);
+    const [newExpenseTitle, setNewExpenseTitle] = useState('');
+    const [newExpenseAmount, setNewExpenseAmount] = useState('');
+    const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory>('others');
+
+    // Editing States
+    const [editingBrandId, setEditingBrandId] = useState<string | null>(null); // Not used but pattern
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+    const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+    // Itinerary States
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [newEventTitle, setNewEventTitle] = useState('');
+    const [newEventDescription, setNewEventDescription] = useState('');
+    const [newEventTime, setNewEventTime] = useState(new Date());
+    const [newEventType, setNewEventType] = useState<TimelineEvent['type']>('activity');
+    const [showEventTimePicker, setShowEventTimePicker] = useState(false);
+
     useEffect(() => {
         loadTripData();
     }, [id]);
+
+    useEffect(() => {
+        if (tripData) {
+            loadTasks();
+            loadBookings();
+            loadExpenses();
+        }
+    }, [tripData]);
 
     const loadTripData = async () => {
         const savedTrips = await TripsStorage.get();
@@ -88,27 +127,248 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             ];
             setTripEvents(mockEvents);
         }
-
-        // Load tasks
-        const savedTasks = await AsyncStorage.getItem(`trip_tasks_${id}`);
-        if (savedTasks) {
-            setTasks(JSON.parse(savedTasks));
-        } else {
-            const mockTasks: Task[] = [
-                { id: 1, text: 'Preparar documentos', completed: false },
-                { id: 2, text: 'Fazer malas', completed: false },
-            ];
-            setTasks(mockTasks);
-        }
-
-        // Load bookings
-        const savedBookings = await AsyncStorage.getItem('travelease_bookings');
-        if (savedBookings) {
-            const allBookings = JSON.parse(savedBookings);
-            const filtered = allBookings.filter((b: any) => b.tripId === id);
-            setBookingsList(filtered);
-        }
     };
+
+    const loadTasks = async () => {
+        const allTasks = await TasksStorage.get() || [];
+        // Filter tasks for this trip
+        const tripTasks = allTasks.filter((t: Task) => t.tripId === id);
+        setTasks(tripTasks);
+    };
+
+    const loadBookings = async () => {
+        const allBookings = await BookingsStorage.get() || [];
+        const tripBookings = allBookings.filter((b: Booking) => b.tripId === id);
+        setBookingsList(tripBookings);
+    };
+
+    const loadExpenses = async () => {
+        const allExpenses = await ExpensesStorage.get() || [];
+        const tripExpenses = allExpenses.filter((e: Expense) => e.tripId === id);
+        setExpenses(tripExpenses);
+    };
+
+    const openTaskModal = (task?: Task) => {
+        if (task) {
+            setEditingTaskId(task.id);
+            setNewTaskText(task.text);
+        } else {
+            setEditingTaskId(null);
+            setNewTaskText('');
+        }
+        setShowTaskModal(true);
+    };
+
+    const handleSaveTask = async () => {
+        if (!newTaskText.trim()) return;
+
+        const allTasks = await TasksStorage.get() || [];
+        let updatedTasks;
+
+        if (editingTaskId) {
+            updatedTasks = allTasks.map((t: Task) =>
+                t.id === editingTaskId ? { ...t, text: newTaskText } : t
+            );
+        } else {
+            const newTask: Task = {
+                id: Date.now().toString(),
+                tripId: id,
+                text: newTaskText,
+                completed: false
+            };
+            updatedTasks = [...allTasks, newTask];
+        }
+
+        await TasksStorage.set(updatedTasks);
+        loadTasks();
+        setNewTaskText('');
+        setEditingTaskId(null);
+        setShowTaskModal(false);
+    };
+
+    const handleToggleTask = async (taskId: string) => {
+        const allTasks = await TasksStorage.get() || [];
+        const updatedTasks = allTasks.map((t: Task) =>
+            t.id === taskId ? { ...t, completed: !t.completed } : t
+        );
+        await TasksStorage.set(updatedTasks);
+        loadTasks();
+    };
+
+    const openBookingModal = (booking?: Booking) => {
+        if (booking) {
+            setEditingBookingId(booking.id);
+            setNewBookingType(booking.type);
+            setNewBookingProvider(booking.provider);
+            setNewBookingRef(booking.reference || '');
+            // Simple date parse assuming YYYY-MM-DD
+            const [year, month, day] = booking.date.split('-').map(Number);
+            setNewBookingDate(new Date(year, month - 1, day));
+        } else {
+            setEditingBookingId(null);
+            setNewBookingType('flight');
+            setNewBookingProvider('');
+            setNewBookingRef('');
+            setNewBookingDate(new Date());
+        }
+        setShowBookingModal(true);
+    };
+
+    const handleSaveBooking = async () => {
+        if (!newBookingProvider.trim()) {
+            Alert.alert('Erro', 'Informe o fornecedor/local');
+            return;
+        }
+
+        const allBookings = await BookingsStorage.get() || [];
+        let updatedBookings;
+        const formattedDate = newBookingDate.toISOString().split('T')[0];
+
+        if (editingBookingId) {
+            updatedBookings = allBookings.map((b: Booking) =>
+                b.id === editingBookingId ? {
+                    ...b,
+                    type: newBookingType,
+                    provider: newBookingProvider,
+                    reference: newBookingRef,
+                    date: formattedDate
+                } : b
+            );
+        } else {
+            const newBooking: Booking = {
+                id: Date.now().toString(),
+                tripId: id,
+                type: newBookingType,
+                provider: newBookingProvider,
+                reference: newBookingRef,
+                date: formattedDate,
+            };
+            updatedBookings = [...allBookings, newBooking];
+        }
+
+        await BookingsStorage.set(updatedBookings);
+        loadBookings();
+        setShowBookingModal(false);
+        setEditingBookingId(null);
+        setNewBookingProvider('');
+        setNewBookingRef('');
+        setNewBookingType('flight');
+    };
+
+    const handleDeleteBooking = async (bookingId: string) => {
+        Alert.alert('Excluir Reserva', 'Tem certeza?', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Excluir',
+                style: 'destructive',
+                onPress: async () => {
+                    const allBookings = await BookingsStorage.get() || [];
+                    const updatedBookings = allBookings.filter((b: Booking) => b.id !== bookingId);
+                    await BookingsStorage.set(updatedBookings);
+                    loadBookings();
+                }
+            }
+        ]);
+    };
+
+    const onBookingDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') setShowBookingDatePicker(false);
+        if (selectedDate) setNewBookingDate(selectedDate);
+    };
+
+    const handleDeleteTask = async (taskId: string) => {
+        Alert.alert(
+            "Excluir Tarefa",
+            "Tem certeza?",
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Excluir",
+                    style: "destructive",
+                    onPress: async () => {
+                        const allTasks = await TasksStorage.get() || [];
+                        const updatedTasks = allTasks.filter((t: Task) => t.id !== taskId);
+                        await TasksStorage.set(updatedTasks);
+                        loadTasks();
+                    }
+                }
+            ]
+        );
+    };
+
+    const openExpenseModal = (expense?: Expense) => {
+        if (expense) {
+            setEditingExpenseId(expense.id);
+            setNewExpenseTitle(expense.description);
+            setNewExpenseAmount(expense.amount.toString().replace('.', ','));
+            setNewExpenseCategory(expense.category);
+        } else {
+            setEditingExpenseId(null);
+            setNewExpenseTitle('');
+            setNewExpenseAmount('');
+            setNewExpenseCategory('others');
+        }
+        setShowExpenseModal(true);
+    };
+
+    const handleSaveExpense = async () => {
+        if (!newExpenseTitle || !newExpenseAmount) {
+            Alert.alert('Erro', 'Preencha descrição e valor');
+            return;
+        }
+
+        const amount = parseFloat(newExpenseAmount.replace(',', '.'));
+        const allExpenses = await ExpensesStorage.get() || [];
+        let updatedExpenses;
+
+        if (editingExpenseId) {
+            updatedExpenses = allExpenses.map((e: Expense) =>
+                e.id === editingExpenseId ? {
+                    ...e,
+                    description: newExpenseTitle,
+                    amount: amount,
+                    category: newExpenseCategory
+                } : e
+            );
+        } else {
+            const newExpense: Expense = {
+                id: Date.now().toString(),
+                tripId: id,
+                description: newExpenseTitle,
+                amount: amount,
+                category: newExpenseCategory,
+                date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+            };
+            updatedExpenses = [...allExpenses, newExpense];
+        }
+
+        await ExpensesStorage.set(updatedExpenses);
+        loadExpenses();
+        setShowExpenseModal(false);
+        setEditingExpenseId(null);
+        setNewExpenseTitle('');
+        setNewExpenseAmount('');
+        setNewExpenseCategory('others');
+    };
+
+    const handleDeleteExpense = async (expenseId: string) => {
+        Alert.alert('Excluir Despesa', 'Tem certeza?', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Excluir',
+                style: 'destructive',
+                onPress: async () => {
+                    const allExpenses = await ExpensesStorage.get() || [];
+                    const updatedExpenses = allExpenses.filter((e: Expense) => e.id !== expenseId);
+                    await ExpensesStorage.set(updatedExpenses);
+                    loadExpenses();
+                }
+            }
+        ]);
+    };
+
+
+
 
     const openEditModal = () => {
         if (tripData) {
@@ -206,28 +466,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         setShowEditModal(false);
     };
 
-    const handleToggleTask = async (taskId: number) => {
-        const updated = tasks.map(t =>
-            t.id === taskId ? { ...t, completed: !t.completed } : t
-        );
-        setTasks(updated);
-        await AsyncStorage.setItem(`trip_tasks_${id}`, JSON.stringify(updated));
-    };
 
-    const handleDeleteTask = (taskId: number) => {
-        Alert.alert('Confirmar', 'Excluir esta tarefa?', [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-                text: 'Excluir',
-                style: 'destructive',
-                onPress: async () => {
-                    const updated = tasks.filter(t => t.id !== taskId);
-                    setTasks(updated);
-                    await AsyncStorage.setItem(`trip_tasks_${id}`, JSON.stringify(updated));
-                },
-            },
-        ]);
-    };
 
     const handleDeleteItinerary = (eventId: string) => {
         Alert.alert('Confirmar', 'Excluir item do itinerário?', [
@@ -262,11 +501,96 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         return iconMap[type] || 'place';
     };
 
+    const openEventModal = (event?: TimelineEvent) => {
+        if (event) {
+            setEditingEventId(event.id);
+            setNewEventTitle(event.title);
+            setNewEventDescription(event.description);
+            setNewEventType(event.type);
+
+            // Try to parse HH:mm
+            const [hours, minutes] = event.time.split(':').map(Number);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                setNewEventTime(date);
+            }
+        } else {
+            setEditingEventId(null);
+            setNewEventTitle('');
+            setNewEventDescription('');
+            setNewEventTime(new Date());
+            setNewEventType('activity');
+        }
+        setShowEventModal(true);
+    };
+
+    const handleSaveEvent = async () => {
+        if (!newEventTitle.trim()) {
+            Alert.alert("Erro", "Informe o título do evento");
+            return;
+        }
+
+        const timeString = newEventTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        let updatedEvents: TimelineEvent[];
+
+        if (editingEventId) {
+            updatedEvents = tripEvents.map(e =>
+                e.id === editingEventId ? {
+                    ...e,
+                    time: timeString,
+                    title: newEventTitle,
+                    description: newEventDescription,
+                    type: newEventType
+                } : e
+            );
+        } else {
+            const newEvent: TimelineEvent = {
+                id: Date.now().toString(),
+                time: timeString,
+                title: newEventTitle,
+                description: newEventDescription,
+                type: newEventType,
+            };
+            updatedEvents = [...tripEvents, newEvent];
+        }
+
+        updatedEvents.sort((a, b) => a.time.localeCompare(b.time));
+        setTripEvents(updatedEvents);
+
+        // Persist
+        try {
+            await AsyncStorage.setItem(`trip_events_${id}`, JSON.stringify(updatedEvents));
+        } catch (error) {
+            console.error('Error saving events:', error);
+            Alert.alert('Erro', 'Falha ao salvar evento.');
+        }
+
+        setShowEventModal(false);
+        setEditingEventId(null);
+        setNewEventTitle('');
+        setNewEventDescription('');
+        setNewEventType('activity');
+    };
+
+    const onEventTimeChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') setShowEventTimePicker(false);
+        if (selectedDate) setNewEventTime(selectedDate);
+    };
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'itinerary':
                 return (
                     <View style={styles.tabContent}>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => openEventModal()}
+                        >
+                            <Text style={styles.addButtonText}>+ Novo Evento</Text>
+                        </TouchableOpacity>
+
                         {tripEvents.length > 0 ? (
                             tripEvents.map((event, index) => (
                                 <View key={event.id} style={styles.eventCard}>
@@ -277,11 +601,14 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                             color="#137fec"
                                         />
                                     </View>
-                                    <View style={styles.eventContent}>
+                                    <TouchableOpacity
+                                        onPress={() => openEventModal(event)}
+                                        style={styles.eventContent}
+                                    >
                                         <Text style={styles.eventTime}>{event.time}</Text>
                                         <Text style={styles.eventTitle}>{event.title}</Text>
                                         <Text style={styles.eventDescription}>{event.description}</Text>
-                                    </View>
+                                    </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => handleDeleteItinerary(event.id)}
                                         style={styles.iconButton}
@@ -299,21 +626,41 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             case 'bookings':
                 return (
                     <View style={styles.tabContent}>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => setShowBookingModal(true)}
+                        >
+                            <Text style={styles.addButtonText}>+ Nova Reserva</Text>
+                        </TouchableOpacity>
+
                         {bookingsList.length > 0 ? (
                             bookingsList.map(booking => (
                                 <View key={booking.id} style={styles.bookingCard}>
-                                    <View style={styles.bookingInfo}>
-                                        <Text style={styles.bookingTitle}>{booking.data?.name || 'Reserva'}</Text>
-                                        <Text style={styles.bookingRef}>Ref: {booking.data?.ref || '-'}</Text>
-                                        <Text style={styles.bookingDate}>{booking.data?.date || '-'}</Text>
-                                    </View>
-                                    <TouchableOpacity style={styles.iconButton}>
-                                        <MaterialIcons name="description" size={20} color="#137fec" />
+                                    <TouchableOpacity
+                                        style={styles.bookingMainClickable}
+                                        onPress={() => openBookingModal(booking)}
+                                    >
+                                        <View style={styles.iconContainer}>
+                                            <MaterialIcons name={getBookingIcon(booking.type)} size={20} color="#137fec" />
+                                        </View>
+                                        <View style={styles.bookingInfo}>
+                                            <Text style={styles.bookingTitle}>{booking.provider}</Text>
+                                            <Text style={styles.bookingDate}>
+                                                {booking.date.includes('-') ? new Date(booking.date).toLocaleDateString('pt-BR') : booking.date}
+                                            </Text>
+                                            {booking.reference ? <Text style={styles.bookingRef}>Ref: {booking.reference}</Text> : null}
+                                        </View>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.iconButton}
+                                        onPress={() => handleDeleteBooking(booking.id)}
+                                    >
+                                        <MaterialIcons name="delete" size={20} color="#ef4444" />
                                     </TouchableOpacity>
                                 </View>
                             ))
                         ) : (
-                            <Text style={styles.emptyText}>Nenhuma reserva.</Text>
+                            <Text style={styles.emptyText}>Nenhuma reserva. Adicione uma!</Text>
                         )}
                     </View>
                 );
@@ -321,6 +668,13 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             case 'tasks':
                 return (
                     <View style={styles.tabContent}>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => openTaskModal()}
+                        >
+                            <Text style={styles.addButtonText}>+ Nova Tarefa</Text>
+                        </TouchableOpacity>
+
                         {tasks.map(task => (
                             <View key={task.id} style={styles.taskCard}>
                                 <TouchableOpacity
@@ -338,24 +692,29 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                         )}
                                     </View>
                                 </TouchableOpacity>
-                                <Text
-                                    style={[
-                                        styles.taskText,
-                                        task.completed && styles.taskTextCompleted,
-                                    ]}
+                                <TouchableOpacity
+                                    style={{ flex: 1 }}
+                                    onPress={() => openTaskModal(task)}
                                 >
-                                    {task.text}
-                                </Text>
+                                    <Text
+                                        style={[
+                                            styles.taskText,
+                                            task.completed && styles.taskTextCompleted,
+                                        ]}
+                                    >
+                                        {task.text}
+                                    </Text>
+                                </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => handleDeleteTask(task.id)}
                                     style={styles.iconButton}
                                 >
-                                    <MaterialIcons name="delete" size={18} color="#9ca3af" />
+                                    <MaterialIcons name="delete" size={20} color="#ef4444" />
                                 </TouchableOpacity>
                             </View>
                         ))}
                         {tasks.length === 0 && (
-                            <Text style={styles.emptyText}>Nenhuma tarefa.</Text>
+                            <Text style={styles.emptyText}>Nenhuma tarefa. Adicione uma!</Text>
                         )}
                     </View>
                 );
@@ -363,7 +722,50 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             case 'expenses':
                 return (
                     <View style={styles.tabContent}>
-                        <Text style={styles.emptyText}>Despesas em desenvolvimento</Text>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => openExpenseModal()}
+                        >
+                            <Text style={styles.addButtonText}>+ Nova Despesa</Text>
+                        </TouchableOpacity>
+
+                        {expenses.length > 0 ? (
+                            expenses.map(expense => (
+                                <View key={expense.id} style={styles.transactionCard}>
+                                    <View style={styles.iconContainer}>
+                                        <MaterialIcons
+                                            name={getCategoryIcon(expense.category)}
+                                            size={20}
+                                            color="#ef4444"
+                                        />
+                                    </View>
+                                    <TouchableOpacity
+                                        style={{ flex: 1 }}
+                                        onPress={() => openExpenseModal(expense)}
+                                    >
+                                        <View style={styles.transactionInfo}>
+                                            <Text style={styles.transactionTitle}>{expense.description}</Text>
+                                            <Text style={styles.transactionCategory}>
+                                                {getCategoryName(expense.category)} • {expense.date}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={[styles.transactionAmount, styles.expenseAmount]}>
+                                            R$ {expense.amount.toLocaleString('pt-BR')}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={{ marginLeft: 8 }}
+                                            onPress={() => handleDeleteExpense(expense.id)}
+                                        >
+                                            <MaterialIcons name="delete" size={18} color="#ef4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.emptyText}>Nenhuma despesa registrada.</Text>
+                        )}
                     </View>
                 );
 
@@ -465,6 +867,200 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.contentContainer}>{renderTabContent()}</View>
             </ScrollView>
 
+            {/* Task Add Modal */}
+            <Modal
+                transparent={true}
+                visible={showTaskModal}
+                animationType="slide"
+                onRequestClose={() => setShowTaskModal(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Nova Tarefa</Text>
+                            <TouchableOpacity onPress={() => setShowTaskModal(false)}>
+                                <MaterialIcons name="close" size={24} color="#111418" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.modalForm}>
+                            <Text style={styles.modalLabel}>O que precisa ser feito?</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newTaskText}
+                                onChangeText={setNewTaskText}
+                                placeholder="Ex: Comprar adaptador de tomada"
+                                autoFocus
+                            />
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSaveTask}
+                            >
+                                <Text style={styles.saveButtonText}>Salvar Tarefa</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+
+
+            {/* Booking Modal */}
+            <Modal
+                transparent={true}
+                visible={showBookingModal}
+                animationType="slide"
+                onRequestClose={() => setShowBookingModal(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Nova Reserva</Text>
+                            <TouchableOpacity onPress={() => setShowBookingModal(false)}>
+                                <MaterialIcons name="close" size={24} color="#111418" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalForm}>
+                            <Text style={styles.modalLabel}>Tipo</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeContainer}>
+                                {['flight', 'hotel', 'car_rental', 'tour', 'ticket', 'other'].map((type) => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        style={[
+                                            styles.typeChip,
+                                            newBookingType === type && styles.typeChipActive
+                                        ]}
+                                        onPress={() => setNewBookingType(type as BookingType)}
+                                    >
+                                        <Text style={[
+                                            styles.typeChipText,
+                                            newBookingType === type && styles.typeChipTextActive
+                                        ]}>
+                                            {formatBookingType(type)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            <Text style={styles.modalLabel}>Fornecedor / Local</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newBookingProvider}
+                                onChangeText={setNewBookingProvider}
+                                placeholder="Ex: Azul, Hotel Ibis, Localiza"
+                            />
+
+                            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Data</Text>
+                            <TouchableOpacity
+                                style={styles.modalDateButton}
+                                onPress={() => setShowBookingDatePicker(true)}
+                            >
+                                <Text style={styles.modalDateValue}>
+                                    {newBookingDate.toLocaleDateString()}
+                                </Text>
+                            </TouchableOpacity>
+                            {showBookingDatePicker && (
+                                <DateTimePicker
+                                    value={newBookingDate}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={onBookingDateChange}
+                                />
+                            )}
+
+                            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Código de Reserva / Ticket</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newBookingRef}
+                                onChangeText={setNewBookingRef}
+                                placeholder="Ex: AB1234"
+                            />
+
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSaveBooking}
+                            >
+                                <Text style={styles.saveButtonText}>Salvar Reserva</Text>
+                            </TouchableOpacity>
+                            <View style={{ height: 40 }} />
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Expense Modal */}
+            <Modal
+                transparent={true}
+                visible={showExpenseModal}
+                animationType="slide"
+                onRequestClose={() => setShowExpenseModal(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Nova Despesa</Text>
+                            <TouchableOpacity onPress={() => setShowExpenseModal(false)}>
+                                <MaterialIcons name="close" size={24} color="#111418" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.modalForm}>
+                            <Text style={styles.modalLabel}>Descrição</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newExpenseTitle}
+                                onChangeText={setNewExpenseTitle}
+                                placeholder="Ex: Jantar, Táxi"
+                            />
+
+                            <Text style={styles.modalLabel}>Valor (R$)</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newExpenseAmount}
+                                onChangeText={setNewExpenseAmount}
+                                placeholder="0,00"
+                                keyboardType="numeric"
+                            />
+
+                            <Text style={styles.modalLabel}>Categoria</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeContainer}>
+                                {(['food', 'transport', 'accommodation', 'shopping', 'activities', 'others'] as ExpenseCategory[]).map(cat => (
+                                    <TouchableOpacity
+                                        key={cat}
+                                        style={[
+                                            styles.typeChip,
+                                            newExpenseCategory === cat && styles.typeChipActive
+                                        ]}
+                                        onPress={() => setNewExpenseCategory(cat)}
+                                    >
+                                        <Text style={[
+                                            styles.typeChipText,
+                                            newExpenseCategory === cat && styles.typeChipTextActive
+                                        ]}>
+                                            {getCategoryName(cat)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSaveExpense}
+                            >
+                                <Text style={styles.saveButtonText}>Salvar Despesa</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
             {/* Edit Modal */}
             <Modal
                 visible={showEditModal}
@@ -545,7 +1141,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                         key="start-date-picker"
                                         value={editStartDate || new Date()}
                                         mode="date"
-                                        display="default"
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                                         onChange={handleStartDateChange}
                                         minimumDate={new Date()}
                                         locale="pt-BR"
@@ -561,7 +1157,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                             return nextDay;
                                         })()}
                                         mode="date"
-                                        display="default"
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                                         onChange={handleEndDateChange}
                                         minimumDate={editStartDate}
                                         locale="pt-BR"
@@ -599,6 +1195,94 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                     <Text style={styles.modalButtonTextSave}>Salvar</Text>
                                 </TouchableOpacity>
                             </View>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Itinerary Modal */}
+            <Modal
+                transparent={true}
+                visible={showEventModal}
+                animationType="slide"
+                onRequestClose={() => setShowEventModal(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Novo Evento</Text>
+                            <TouchableOpacity onPress={() => setShowEventModal(false)}>
+                                <MaterialIcons name="close" size={24} color="#111418" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalForm}>
+                            <Text style={styles.modalLabel}>Título</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newEventTitle}
+                                onChangeText={setNewEventTitle}
+                                placeholder="Ex: Jantar, Passeio"
+                            />
+
+                            <Text style={styles.modalLabel}>Horário</Text>
+                            <TouchableOpacity
+                                style={styles.modalDateButton}
+                                onPress={() => setShowEventTimePicker(true)}
+                            >
+                                <Text style={styles.modalDateValue}>
+                                    {newEventTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                            </TouchableOpacity>
+                            {showEventTimePicker && (
+                                <DateTimePicker
+                                    value={newEventTime}
+                                    mode="time"
+                                    is24Hour={true}
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={onEventTimeChange}
+                                    locale="pt-BR"
+                                />
+                            )}
+
+                            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Descrição (Opcional)</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={newEventDescription}
+                                onChangeText={setNewEventDescription}
+                                placeholder="Detalhes..."
+                            />
+
+                            <Text style={styles.modalLabel}>Tipo</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeContainer}>
+                                {(['flight', 'hotel', 'activity', 'dinner', 'transport', 'leisure', 'shopping', 'museum'] as TimelineEvent['type'][]).map(type => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        style={[
+                                            styles.typeChip,
+                                            newEventType === type && styles.typeChipActive
+                                        ]}
+                                        onPress={() => setNewEventType(type)}
+                                    >
+                                        <Text style={[
+                                            styles.typeChipText,
+                                            newEventType === type && styles.typeChipTextActive
+                                        ]}>
+                                            {formatBookingType(type)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSaveEvent}
+                            >
+                                <Text style={styles.saveButtonText}>Salvar Evento</Text>
+                            </TouchableOpacity>
+                            <View style={{ height: 40 }} />
                         </ScrollView>
                     </View>
                 </KeyboardAvoidingView>
@@ -769,17 +1453,27 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     bookingCard: {
-        flexDirection: 'row',
         backgroundColor: '#fff',
         borderRadius: 16,
         padding: 16,
+        marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        justifyContent: 'space-between',
+    },
+    bookingMainClickable: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
     },
     bookingInfo: {
         flex: 1,
+    },
+    bookingHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 2,
     },
     bookingTitle: {
         fontSize: 14,
@@ -868,17 +1562,24 @@ const styles = StyleSheet.create({
         color: '#111418',
         marginBottom: 8,
     },
+    modalForm: {
+        padding: 20,
+    },
     modalInput: {
-        backgroundColor: '#f3f4f6',
+        backgroundColor: '#f9fafb',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
         borderRadius: 12,
-        padding: 14,
-        fontSize: 15,
+        padding: 12,
+        fontSize: 16,
         color: '#111418',
+        marginBottom: 20,
     },
     dateRow: {
         flexDirection: 'row',
         gap: 12,
     },
+
     modalDateButton: {
         flex: 1,
         backgroundColor: '#f3f4f6',
@@ -941,6 +1642,142 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
     },
+    saveButton: {
+        backgroundColor: '#137fec',
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+    },
+    saveButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    addButton: {
+        backgroundColor: '#eff6ff',
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#137fec',
+        borderStyle: 'dashed',
+    },
+    addButtonText: {
+        color: '#137fec',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+
+    typeContainer: {
+        flexDirection: 'row',
+        marginBottom: 16,
+    },
+    typeChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f3f4f6',
+        marginRight: 8,
+    },
+    typeChipActive: {
+        backgroundColor: '#137fec',
+    },
+    typeChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4b5563',
+    },
+    typeChipTextActive: {
+        color: '#fff',
+    },
+    transactionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f3f4f6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    transactionInfo: {
+        flex: 1,
+    },
+    transactionTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#111418',
+        marginBottom: 2,
+    },
+    transactionCategory: {
+        fontSize: 11,
+        color: '#6b7280',
+    },
+    transactionAmount: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    expenseAmount: {
+        color: '#ef4444',
+    },
 });
+
+const getCategoryIcon = (cat: ExpenseCategory): keyof typeof MaterialIcons.glyphMap => {
+    const map: Record<ExpenseCategory, keyof typeof MaterialIcons.glyphMap> = {
+        food: 'restaurant',
+        transport: 'flight',
+        accommodation: 'hotel',
+        activities: 'local-activity',
+        shopping: 'shopping-bag',
+        others: 'attach-money',
+    };
+    return map[cat] || 'attach-money';
+};
+
+const getCategoryName = (cat: ExpenseCategory) => {
+    const map: Record<ExpenseCategory, string> = {
+        food: 'Alimentação',
+        transport: 'Transporte',
+        accommodation: 'Hospedagem',
+        activities: 'Atividades',
+        shopping: 'Compras',
+        others: 'Outros',
+    };
+    return map[cat];
+};
+
+const getBookingIcon = (type: string) => {
+    switch (type) {
+        case 'flight': return 'flight';
+        case 'hotel': return 'hotel';
+        case 'car_rental': return 'directions-car';
+        case 'tour': return 'map';
+        case 'ticket': return 'confirmation-number';
+        default: return 'bookmark';
+    }
+};
+
+const formatBookingType = (type: string) => {
+    switch (type) {
+        case 'flight': return 'Voo';
+        case 'hotel': return 'Hotel';
+        case 'car_rental': return 'Carro';
+        case 'tour': return 'Passeio';
+        case 'ticket': return 'Ingresso';
+        default: return 'Outro';
+    }
+};
 
 export default TripDetailsScreen;

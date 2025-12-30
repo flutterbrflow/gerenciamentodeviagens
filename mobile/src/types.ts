@@ -41,6 +41,46 @@ export interface Transaction {
   icon: string;
 }
 
+export type ExpenseCategory = 'food' | 'transport' | 'accommodation' | 'activities' | 'shopping' | 'others';
+
+export interface Expense {
+  id: string;
+  tripId: string;
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  date: string;
+}
+
+export interface Budget {
+  tripId: string;
+  totalBudget: number;
+  currency: string;
+}
+
+export interface Task {
+  id: string;
+  tripId: string;
+  text: string;
+  completed: boolean;
+}
+
+export type BookingType = 'flight' | 'hotel' | 'car_rental' | 'tour' | 'ticket' | 'other';
+
+export interface Booking {
+  id: string;
+  tripId: string;
+  type: BookingType;
+  provider: string;
+  reference?: string;
+  date: string;
+  endDate?: string;
+  details?: string;
+  cost?: number;
+  currency?: string;
+  fileUrl?: string;
+}
+
 export type TabType = 'itinerary' | 'bookings' | 'tasks' | 'expenses';
 
 // Navigation types
@@ -49,7 +89,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   TripDetails: { id: string };
   NewTrip: undefined;
-  NewBooking: { tripId?: string };
+  NewBooking: { tripId?: string; booking?: any };
 };
 
 export type MainTabParamList = {

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Trip, MainTabParamList } from '../types';
-import { TripsStorage } from '../utils/storage';
+import { TripsStorage, ProfileStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
@@ -120,9 +120,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     const loadProfileImage = async () => {
         try {
-            const saved = await AsyncStorage.getItem('profile_image');
-            if (saved) {
-                setProfileImage(saved);
+            const profile = await ProfileStorage.get();
+            if (profile?.avatarUri) {
+                setProfileImage(profile.avatarUri);
             }
         } catch (error) {
             console.error('Error loading profile image:', error);
@@ -142,10 +142,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
                 <Text style={styles.headerTitle}>Minhas Viagens</Text>
 
-                <TouchableOpacity style={styles.notificationButton}>
-                    <MaterialIcons name="notifications" size={20} color="#111418" />
-                    <View style={styles.notificationBadge} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={() => navigation.navigate('NewTrip')}
+                    >
+                        <MaterialIcons name="add" size={24} color="#137fec" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.notificationButton}
+                        onPress={() => alert('Sem novas notificações')}
+                    >
+                        <MaterialIcons name="notifications" size={20} color="#111418" />
+                        <View style={styles.notificationBadge} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Tab Selector */}
@@ -247,14 +259,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 </TouchableOpacity>
             </ScrollView>
 
-            {/* Floating Action Button */}
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => navigation.navigate('NewTrip')}
-                activeOpacity={0.9}
-            >
-                <MaterialIcons name="add" size={26} color="#fff" />
-            </TouchableOpacity>
+
         </SafeAreaView>
     );
 };
@@ -285,6 +290,14 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '800',
         color: '#111418',
+    },
+    addButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#eff6ff',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     notificationButton: {
         width: 36,

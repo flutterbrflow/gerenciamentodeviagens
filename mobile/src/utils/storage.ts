@@ -5,6 +5,9 @@ const STORAGE_KEYS = {
     BOOKINGS: '@travelease_bookings',
     MEMORIES: '@travelease_memories',
     PROFILE: '@travelease_profile',
+    EXPENSES: '@travelease_expenses',
+    BUDGET: '@travelease_budget',
+    TASKS: '@travelease_tasks',
 } as const;
 
 export class Storage {
@@ -76,4 +79,22 @@ export const ProfileStorage = {
     get: () => Storage.get<any>(STORAGE_KEYS.PROFILE),
     set: (profile: any) => Storage.set(STORAGE_KEYS.PROFILE, profile),
     remove: () => Storage.remove(STORAGE_KEYS.PROFILE),
+};
+
+export const ExpensesStorage = {
+    get: () => Storage.get<any[]>(STORAGE_KEYS.EXPENSES),
+    set: (expenses: any[]) => Storage.set(STORAGE_KEYS.EXPENSES, expenses),
+    remove: () => Storage.remove(STORAGE_KEYS.EXPENSES),
+};
+
+export const BudgetStorage = {
+    get: () => Storage.get<any[]>(STORAGE_KEYS.BUDGET), // Array of budgets per trip
+    set: (budgets: any[]) => Storage.set(STORAGE_KEYS.BUDGET, budgets),
+    remove: () => Storage.remove(STORAGE_KEYS.BUDGET),
+};
+
+export const TasksStorage = {
+    get: () => Storage.get<any[]>(STORAGE_KEYS.TASKS),
+    set: (tasks: any[]) => Storage.set(STORAGE_KEYS.TASKS, tasks),
+    remove: () => Storage.remove(STORAGE_KEYS.TASKS),
 };

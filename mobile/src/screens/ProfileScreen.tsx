@@ -15,10 +15,10 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../types';
-import { TripsStorage } from '../utils/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TripsStorage, ProfileStorage } from '../utils/storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import resetAndPopulateData from '../utils/resetData';
 
 type ProfileNavigationProp = CompositeNavigationProp<
     BottomTabNavigationProp<MainTabParamList, 'Profile'>,
@@ -56,9 +56,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
     const loadProfileImage = async () => {
         try {
-            const savedImage = await AsyncStorage.getItem('profile_image');
-            if (savedImage) {
-                setProfileImage(savedImage);
+            const profile = await ProfileStorage.get();
+            if (profile?.avatarUri) {
+                setProfileImage(profile.avatarUri);
             }
         } catch (error) {
             console.error('Error loading profile image:', error);
@@ -67,7 +67,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
     const saveProfileImage = async (uri: string) => {
         try {
-            await AsyncStorage.setItem('profile_image', uri);
+            const currentProfile = await ProfileStorage.get() || {};
+            const newProfile = { ...currentProfile, avatarUri: uri };
+            await ProfileStorage.set(newProfile);
             setProfileImage(uri);
         } catch (error) {
             console.error('Error saving profile image:', error);
@@ -145,6 +147,28 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
     const handleLogout = () => {
         navigation.navigate('Onboarding');
+    };
+
+    const handleResetData = async () => {
+        Alert.alert(
+            'Resetar Dados',
+            'Isso irá apagar todas as viagens e cadastrar novos dados de exemplo. Deseja continuar?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Confirmar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        const success = await resetAndPopulateData();
+                        if (success) {
+                            Alert.alert('Sucesso!', 'Dados resetados. Reinicie o app para ver as alterações.');
+                        } else {
+                            Alert.alert('Erro', 'Falha ao resetar dados.');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const statItems = [
@@ -274,6 +298,14 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                             <Text style={styles.settingValue}>Português</Text>
                         </TouchableOpacity>
                     </View>
+                </View>
+
+                {/* Reset Data Button */}
+                <View style={styles.logoutContainer}>
+                    <TouchableOpacity style={styles.resetButton} onPress={handleResetData}>
+                        <MaterialIcons name="refresh" size={20} color="#137fec" />
+                        <Text style={styles.resetText}>Resetar Dados (Demo)</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Logout Button */}
@@ -468,6 +500,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#fef2f2',
         paddingVertical: 16,
         borderRadius: 16,
+    },
+    resetButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#eff6ff',
+        paddingVertical: 16,
+        borderRadius: 16,
+    },
+    resetText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#137fec',
     },
     logoutText: {
         fontSize: 13,
