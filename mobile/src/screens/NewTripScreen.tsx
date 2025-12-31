@@ -9,6 +9,7 @@ import {
     SafeAreaView,
     Alert,
     Platform,
+    Modal,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Trip } from '../types';
@@ -28,18 +29,26 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
 
     // Date states
-    const [startDate, setStartDate] = useState<Date | null>(null);
-    const [endDate, setEndDate] = useState<Date | null>(null);
-    const [showStartPicker, setShowStartPicker] = useState(false);
-    const [showEndPicker, setShowEndPicker] = useState(false);
+    const [startDate, setStartDate] = useState<Date>(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return today;
+    });
+    const [endDate, setEndDate] = useState<Date>(() => {
+        const future = new Date();
+        future.setDate(future.getDate() + 7);
+        future.setHours(0, 0, 0, 0);
+        return future;
+    });
+    const [showPicker, setShowPicker] = useState(false);
+    const [currentPicker, setCurrentPicker] = useState<'start' | 'end'>('start');
+    const [tempValue, setTempValue] = useState<Date>(new Date());
 
-    const formatDate = (date: Date | null): string => {
-        if (!date) return 'Selecionar';
+    const formatDate = (date: Date): string => {
         return date.toLocaleDateString('pt-BR', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        });
+            day: '2-digit',
+            month: 'short'
+        }).replace('.', '');
     };
 
     const formatDateRange = (start: Date | null, end: Date | null): string => {
@@ -60,45 +69,39 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
         return `${startDay} ${month}, ${year}`;
     };
 
-    const handleStartDateChange = (event: any, selectedDate?: Date) => {
-        // Close picker on Android immediately
-        if (Platform.OS === 'android') {
-            setShowStartPicker(false);
-        }
+    const openDatePicker = (type: 'start' | 'end') => {
+        setCurrentPicker(type);
+        setTempValue(type === 'start' ? startDate : endDate);
+        setShowPicker(true);
+    };
 
-        // Update date on confirmation
-        if (event.type === 'set' && selectedDate) {
-            const newDate = new Date(selectedDate);
-            setStartDate(newDate);
-            // Clear end date if it's before the new start date
-            if (endDate && newDate > endDate) {
-                setEndDate(null);
-            }
-            // Auto-close on iOS after selection
-            if (Platform.OS === 'ios') {
-                setShowStartPicker(false);
-            }
-        } else if (event.type === 'dismissed') {
-            setShowStartPicker(false);
+    const handlePickerChange = (event: any, selectedDate?: Date) => {
+        if (selectedDate) {
+            setTempValue(selectedDate);
         }
     };
 
-    const handleEndDateChange = (event: any, selectedDate?: Date) => {
-        // Close picker on Android immediately
-        if (Platform.OS === 'android') {
-            setShowEndPicker(false);
-        }
-
-        // Update date on confirmation
-        if (event.type === 'set' && selectedDate) {
-            setEndDate(selectedDate);
-            // Auto-close on iOS after selection
-            if (Platform.OS === 'ios') {
-                setShowEndPicker(false);
+    const handlePickerConfirm = () => {
+        if (currentPicker === 'start') {
+            setStartDate(tempValue);
+            // Auto-adjust end date if it's before start date
+            if (tempValue > endDate) {
+                const nextDay = new Date(tempValue);
+                nextDay.setDate(nextDay.getDate() + 1);
+                setEndDate(nextDay);
             }
-        } else if (event.type === 'dismissed') {
-            setShowEndPicker(false);
+        } else {
+            // Validate end date
+            if (tempValue < startDate) {
+                setShowPicker(false);
+                setTimeout(() => {
+                    Alert.alert('Atenção', 'A data de volta não pode ser anterior à data de ida.');
+                }, 100);
+                return;
+            }
+            setEndDate(tempValue);
         }
+        setShowPicker(false);
     };
 
     const handleSave = async () => {
@@ -143,12 +146,10 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.headerTitle}>Nova Viagem</Text>
                 <TouchableOpacity
                     onPress={handleSave}
-                    style={styles.headerButton}
+                    style={styles.saveIconButton}
                     disabled={loading}
                 >
-                    <Text style={[styles.headerButtonText, styles.saveButton]}>
-                        {loading ? 'Salva...' : 'Salvar'}
-                    </Text>
+                    <MaterialIcons name="save" size={24} color="#137fec" />
                 </TouchableOpacity>
             </View>
 
@@ -179,8 +180,8 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                         {(startDate || endDate) && (
                             <TouchableOpacity
                                 onPress={() => {
-                                    setStartDate(null);
-                                    setEndDate(null);
+                                    setStartDate(new Date());
+                                    setEndDate(new Date());
                                 }}
                             >
                                 <Text style={styles.clearButton}>Limpar</Text>
@@ -188,71 +189,30 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                         )}
                     </View>
 
-                    <View style={styles.dateRow}>
-                        {/* Start Date */}
-                        <TouchableOpacity
-                            style={[
-                                styles.dateButton,
-                                showStartPicker && styles.dateButtonActive,
-                            ]}
-                            onPress={() => {
-                                setShowEndPicker(false);
-                                setShowStartPicker(true);
-                            }}
-                        >
-                            <Text style={styles.dateLabel}>IDA</Text>
-                            <Text style={styles.dateValue}>{formatDate(startDate)}</Text>
-                            <MaterialIcons name="calendar-today" size={16} color="#137fec" />
-                        </TouchableOpacity>
 
-                        {/* End Date */}
-                        <TouchableOpacity
-                            style={[
-                                styles.dateButton,
-                                showEndPicker && styles.dateButtonActive,
-                                !startDate && styles.dateButtonDisabled,
-                            ]}
-                            onPress={() => {
-                                if (startDate) {
-                                    setShowStartPicker(false);
-                                    // Small delay to ensure state updates
-                                    setTimeout(() => {
-                                        setShowEndPicker(true);
-                                    }, 100);
-                                }
-                            }}
-                            disabled={!startDate}
-                        >
-                            <Text style={styles.dateLabel}>VOLTA</Text>
-                            <Text style={styles.dateValue}>{formatDate(endDate)}</Text>
-                            <MaterialIcons name="calendar-today" size={16} color={startDate ? "#137fec" : "#d1d5db"} />
-                        </TouchableOpacity>
+                    <View style={styles.rowInputs}>
+                        <View style={styles.flexInput}>
+                            <Text style={styles.label}>Ida</Text>
+                            <TouchableOpacity
+                                style={styles.dateTimeRow}
+                                onPress={() => openDatePicker('start')}
+                            >
+                                <MaterialIcons name="flight-takeoff" size={16} color="#137fec" />
+                                <Text style={styles.dateTimeText}>{formatDate(startDate)}</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.flexInput}>
+                            <Text style={styles.label}>Volta</Text>
+                            <TouchableOpacity
+                                style={styles.dateTimeRow}
+                                onPress={() => openDatePicker('end')}
+                            >
+                                <MaterialIcons name="flight-land" size={16} color="#137fec" />
+                                <Text style={styles.dateTimeText}>{formatDate(endDate)}</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-
-                    {/* Date Pickers */}
-                    {showStartPicker && (
-                        <DateTimePicker
-                            key="start-date-picker"
-                            value={startDate || new Date()}
-                            mode="date"
-                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                            onChange={handleStartDateChange}
-                            minimumDate={new Date()}
-                            locale="pt-BR"
-                        />
-                    )}
-
-                    {showEndPicker && startDate && (
-                        <DateTimePicker
-                            key={`end-date-picker-${startDate.getTime()}`}
-                            value={endDate || new Date(startDate.getTime() + 24 * 60 * 60 * 1000)}
-                            mode="date"
-                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                            onChange={handleEndDateChange}
-                            minimumDate={startDate}
-                            locale="pt-BR"
-                        />
-                    )}
                 </View>
 
                 {/* Notes Input */}
@@ -281,20 +241,41 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
             </ScrollView>
 
-            {/* Bottom Button */}
-            <View style={styles.bottomContainer}>
-                <TouchableOpacity
-                    style={[styles.createButton, loading && styles.createButtonDisabled]}
-                    onPress={handleSave}
-                    disabled={loading}
-                    activeOpacity={0.8}
+            {/* Date Picker Modal */}
+            {showPicker && (
+                <Modal
+                    visible={showPicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowPicker(false)}
+                    presentationStyle="overFullScreen"
                 >
-                    <MaterialIcons name="flight-takeoff" size={20} color="#fff" />
-                    <Text style={styles.createButtonText}>
-                        {loading ? 'Criando...' : 'Criar Viagem'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
+                    <View style={styles.pickerOverlay}>
+                        <View style={styles.pickerContainer}>
+                            <View style={styles.pickerHeader}>
+                                <TouchableOpacity onPress={() => setShowPicker(false)}>
+                                    <Text style={styles.pickerCancelText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.pickerTitle}>Selecionar Data</Text>
+                                <TouchableOpacity onPress={handlePickerConfirm}>
+                                    <Text style={styles.pickerConfirmText}>Confirmar</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                                key={`${currentPicker}-${tempValue.getTime()}`}
+                                value={tempValue}
+                                mode="date"
+                                display="spinner"
+                                onChange={handlePickerChange}
+                                locale="pt-BR"
+                                textColor="#111418"
+                                style={styles.picker}
+                                minimumDate={currentPicker === 'start' ? new Date() : startDate}
+                            />
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </SafeAreaView>
     );
 };
@@ -326,6 +307,11 @@ const styles = StyleSheet.create({
         color: '#137fec',
         fontWeight: '700',
         textAlign: 'right',
+    },
+    saveIconButton: {
+        minWidth: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 16,
@@ -470,6 +456,69 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#fff',
+    },
+    rowInputs: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    flexInput: {
+        flex: 1,
+    },
+    dateTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    dateTimeText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#111418',
+        flex: 1,
+    },
+    pickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    pickerContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    pickerTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111418',
+    },
+    pickerCancelText: {
+        fontSize: 16,
+        color: '#6b7280',
+    },
+    pickerConfirmText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#137fec',
+    },
+    picker: {
+        height: 200,
     },
 });
 

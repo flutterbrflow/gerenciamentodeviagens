@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,7 +11,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import { CompositeNavigationProp } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type BookingsNavigationProp = CompositeNavigationProp<
@@ -38,15 +38,18 @@ interface Booking {
 const BookingsScreen: React.FC<Props> = ({ navigation }) => {
     const [bookings, setBookings] = useState<Booking[]>([]);
 
-    useEffect(() => {
-        loadBookings();
-    }, []);
-
     const loadBookings = async () => {
+        console.log('🔄 [DEBUG] Carregando reservas...');
         const saved = await AsyncStorage.getItem('travelease_bookings');
+        console.log('📂 [DEBUG] Dados do AsyncStorage:', saved);
+
         if (saved) {
-            setBookings(JSON.parse(saved));
+            const parsed = JSON.parse(saved);
+            console.log('📋 [DEBUG] Reservas carregadas:', parsed.length, 'itens');
+            console.log('📋 [DEBUG] Dados:', JSON.stringify(parsed, null, 2));
+            setBookings(parsed);
         } else {
+            console.log('⚠️ [DEBUG] Nenhum dado salvo, usando dados mockados');
             // Mock data
             const mockBookings: Booking[] = [
                 {
@@ -75,14 +78,27 @@ const BookingsScreen: React.FC<Props> = ({ navigation }) => {
         }
     };
 
+    // Recarrega os dados toda vez que a tela é focada
+    useFocusEffect(
+        useCallback(() => {
+            loadBookings();
+        }, [])
+    );
+
+    const handleDelete = async (bookingId: string) => {
+        const updatedBookings = bookings.filter(b => b.id !== bookingId);
+        setBookings(updatedBookings);
+        await AsyncStorage.setItem('travelease_bookings', JSON.stringify(updatedBookings));
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Minhas Reservas</Text>
+                <Text style={styles.headerTitle}>Reservas</Text>
                 <TouchableOpacity
                     style={styles.addButton}
-                    onPress={() => navigation.navigate('NewBooking')}
+                    onPress={() => navigation.navigate('NewBooking', {})}
                 >
                     <MaterialIcons name="add" size={24} color="#137fec" />
                 </TouchableOpacity>
@@ -95,29 +111,39 @@ const BookingsScreen: React.FC<Props> = ({ navigation }) => {
             >
                 {bookings.length > 0 ? (
                     bookings.map(booking => (
-                        <TouchableOpacity
-                            key={booking.id}
-                            style={styles.bookingCard}
-                            onPress={() => navigation.navigate('NewBooking', { booking })}
-                        >
-                            <View style={styles.iconContainer}>
-                                <MaterialIcons
-                                    name={booking.type === 'flight' ? 'flight' : 'hotel'}
-                                    size={24}
-                                    color="#137fec"
-                                />
-                            </View>
-                            <View style={styles.bookingInfo}>
-                                <Text style={styles.bookingName}>{booking.data?.name || booking.tripName}</Text>
-                                <Text style={styles.bookingRef}>Ref: {booking.data?.ref || '-'}</Text>
-                                <Text style={styles.bookingDate}>
-                                    {booking.data?.date || booking.data?.checkIn || '-'}
-                                </Text>
-                            </View>
-                            <TouchableOpacity style={styles.detailsButton}>
-                                <MaterialIcons name="chevron-right" size={20} color="#9ca3af" />
+                        <View key={booking.id} style={styles.bookingCard}>
+                            <TouchableOpacity
+                                style={styles.bookingCardContent}
+                                onPress={() => navigation.navigate('NewBooking', { booking })}
+                            >
+                                <View style={styles.iconContainer}>
+                                    <MaterialIcons
+                                        name={
+                                            booking.type === 'flight'
+                                                ? 'flight'
+                                                : booking.type === 'car'
+                                                    ? 'directions-car'
+                                                    : 'hotel'
+                                        }
+                                        size={24}
+                                        color="#137fec"
+                                    />
+                                </View>
+                                <View style={styles.bookingInfo}>
+                                    <Text style={styles.bookingName}>{booking.data?.name || booking.tripName}</Text>
+                                    <Text style={styles.bookingRef}>Ref: {booking.data?.ref || '-'}</Text>
+                                    <Text style={styles.bookingDate}>
+                                        {booking.data?.date || booking.data?.checkIn || '-'}
+                                    </Text>
+                                </View>
                             </TouchableOpacity>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={() => handleDelete(booking.id)}
+                            >
+                                <MaterialIcons name="delete-outline" size={20} color="#ef4444" />
+                            </TouchableOpacity>
+                        </View>
                     ))
                 ) : (
                     <View style={styles.emptyContainer}>
@@ -171,10 +197,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#fff',
         borderRadius: 16,
-        padding: 16,
+        paddingLeft: 16,
+        paddingVertical: 16,
         marginBottom: 12,
         borderWidth: 1,
         borderColor: '#e5e7eb',
+    },
+    bookingCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    deleteButton: {
+        padding: 16,
+        paddingRight: 16,
     },
     iconContainer: {
         width: 48,

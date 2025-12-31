@@ -11,11 +11,14 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Alert,
+    Switch,
 } from 'react-native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, Expense, ExpenseCategory } from '../types';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ExpensesStorage } from '../utils/storage';
+import { BudgetConfigStorage, BudgetConfig } from '../utils/budgetStorage';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 type BudgetNavigationProp = BottomTabNavigationProp<MainTabParamList, 'Budget'>;
 
@@ -28,16 +31,36 @@ type FilterType = 'all' | 'today' | 'week' | 'month';
 const BudgetScreen: React.FC<Props> = ({ navigation }) => {
     const [expenses, setExpenses] = React.useState<Expense[]>([]);
     const [modalVisible, setModalVisible] = React.useState(false);
+    const [configModalVisible, setConfigModalVisible] = React.useState(false);
     const [selectedFilter, setSelectedFilter] = React.useState<FilterType>('all');
+
+    // Budget Config
+    const [budgetConfig, setBudgetConfig] = React.useState<BudgetConfig>({
+        totalLimit: 5000,
+        alertThreshold: 80,
+        alertEnabled: true,
+    });
+    const [tempLimit, setTempLimit] = React.useState('');
+    const [tempAlertEnabled, setTempAlertEnabled] = React.useState(true);
 
     // Form State
     const [title, setTitle] = React.useState('');
     const [amount, setAmount] = React.useState('');
     const [category, setCategory] = React.useState<ExpenseCategory>('others');
+    const [expenseDate, setExpenseDate] = React.useState<Date>(new Date());
+    const [showDatePicker, setShowDatePicker] = React.useState(false);
+    const [tempDate, setTempDate] = React.useState<Date>(new Date());
+    const [editingExpenseId, setEditingExpenseId] = React.useState<string | null>(null);
 
     React.useEffect(() => {
         loadExpenses();
+        loadBudgetConfig();
     }, []);
+
+    const loadBudgetConfig = async () => {
+        const config = await BudgetConfigStorage.get();
+        setBudgetConfig(config);
+    };
 
     const loadExpenses = async () => {
         const saved = await ExpensesStorage.get();
@@ -56,29 +79,156 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
         }
     };
 
+    const clearAllExpenses = async () => {
+        setExpenses([]);
+        await ExpensesStorage.set([]);
+        Alert.alert('Sucesso', 'Todas as despesas foram removidas');
+    };
+
+    const createSampleExpenses = async () => {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const fiveDaysAgo = new Date(today);
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        const tenDaysAgo = new Date(today);
+        tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+        const twentyDaysAgo = new Date(today);
+        twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
+
+        const sampleExpenses: Expense[] = [
+            { id: '1', tripId: '1', description: 'Almoço Hoje', category: 'food', amount: 50, date: today.toISOString() },
+            { id: '2', tripId: '1', description: 'Café Ontem', category: 'food', amount: 15, date: yesterday.toISOString() },
+            { id: '3', tripId: '1', description: 'Uber 5 dias', category: 'transport', amount: 30, date: fiveDaysAgo.toISOString() },
+            { id: '4', tripId: '1', description: 'Hotel 10 dias', category: 'accommodation', amount: 200, date: tenDaysAgo.toISOString() },
+            { id: '5', tripId: '1', description: 'Compras 20 dias', category: 'shopping', amount: 120, date: twentyDaysAgo.toISOString() },
+        ];
+
+        setExpenses(sampleExpenses);
+        await ExpensesStorage.set(sampleExpenses);
+        Alert.alert('Pronto!', 'Despesas de exemplo criadas com datas variadas');
+    };
+
+    const handleDeleteExpense = async (expenseId: string) => {
+        Alert.alert(
+            'Excluir Despesa',
+            'Tem certeza que deseja excluir esta despesa?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Excluir',
+                    style: 'destructive',
+                    onPress: async () => {
+                        const updated = expenses.filter(e => e.id !== expenseId);
+                        setExpenses(updated);
+                        await ExpensesStorage.set(updated);
+                    }
+                }
+            ]
+        );
+    };
+
     const handleSaveExpense = async () => {
         if (!title || !amount) {
             Alert.alert('Erro', 'Preencha todos os campos');
             return;
         }
 
-        const newExpense: Expense = {
-            id: Date.now().toString(),
-            tripId: '1', // Defaulting to trip 1 for now, in robust version select trip
-            description: title,
-            amount: parseFloat(amount.replace(',', '.')),
-            category: category,
-            date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
-        };
-
-        const updated = [newExpense, ...expenses];
-        setExpenses(updated);
-        await ExpensesStorage.set(updated);
+        if (editingExpenseId) {
+            // Update existing expense
+            const updated = expenses.map(exp =>
+                exp.id === editingExpenseId
+                    ? {
+                        ...exp,
+                        description: title,
+                        amount: parseFloat(amount.replace(',', '.')),
+                        category: category,
+                        date: expenseDate.toISOString(),
+                    }
+                    : exp
+            );
+            setExpenses(updated);
+            await ExpensesStorage.set(updated);
+        } else {
+            // Create new expense
+            const newExpense: Expense = {
+                id: Date.now().toString(),
+                tripId: '1', // Defaulting to trip 1 for now, in robust version select trip
+                description: title,
+                amount: parseFloat(amount.replace(',', '.')),
+                category: category,
+                date: expenseDate.toISOString(),
+            };
+            const updated = [newExpense, ...expenses];
+            setExpenses(updated);
+            await ExpensesStorage.set(updated);
+        }
 
         setModalVisible(false);
         setTitle('');
         setAmount('');
         setCategory('others');
+        setExpenseDate(new Date());
+        setEditingExpenseId(null);
+    };
+
+    const handleEditExpense = (expense: Expense) => {
+        setEditingExpenseId(expense.id);
+        setTitle(expense.description);
+        setAmount(expense.amount.toString());
+        setCategory(expense.category);
+        setExpenseDate(new Date(expense.date));
+        setModalVisible(true);
+    };
+
+    const showDatePickerHandler = () => {
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: expenseDate,
+                onChange: (event, selectedDate) => {
+                    if (selectedDate) {
+                        setExpenseDate(selectedDate);
+                    }
+                },
+                mode: 'date',
+            });
+        } else {
+            setTempDate(expenseDate);
+            setShowDatePicker(true);
+        }
+    };
+
+    const handleConfirmDate = () => {
+        setExpenseDate(tempDate);
+        setShowDatePicker(false);
+    };
+
+    const handleCancelDate = () => {
+        setShowDatePicker(false);
+    };
+
+    const handleOpenConfigModal = () => {
+        setTempLimit(budgetConfig.totalLimit.toString());
+        setTempAlertEnabled(budgetConfig.alertEnabled);
+        setConfigModalVisible(true);
+    };
+
+    const handleSaveBudgetConfig = async () => {
+        const limit = parseFloat(tempLimit);
+        if (isNaN(limit) || limit <= 0) {
+            Alert.alert('Erro', 'Insira um valor válido');
+            return;
+        }
+
+        const newConfig: BudgetConfig = {
+            totalLimit: limit,
+            alertThreshold: 80,
+            alertEnabled: tempAlertEnabled,
+        };
+
+        setBudgetConfig(newConfig);
+        await BudgetConfigStorage.set(newConfig);
+        setConfigModalVisible(false);
     };
 
     const getCategoryIcon = (cat: ExpenseCategory): keyof typeof MaterialIcons.glyphMap => {
@@ -107,14 +257,12 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
 
     // Date filtering logic
     const isDateInRange = (dateStr: string, filter: FilterType): boolean => {
-        // Parse the date - assuming format like "10 Out" or similar
-        // For now, we'll use the current date from expense object
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Since expenses have dates in format like "10 Out", we'll use a simple approach
-        // In a real app, you'd want proper date parsing
-        const expenseDate = new Date(); // Placeholder - in production parse dateStr properly
+        // Parse ISO date string
+        const expenseDate = new Date(dateStr);
+        expenseDate.setHours(0, 0, 0, 0);
 
         switch (filter) {
             case 'today':
@@ -122,36 +270,87 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
             case 'week':
                 const weekAgo = new Date(today);
                 weekAgo.setDate(weekAgo.getDate() - 7);
-                return expenseDate >= weekAgo;
+                weekAgo.setHours(0, 0, 0, 0);
+                return expenseDate >= weekAgo && expenseDate <= today;
             case 'month':
                 const monthAgo = new Date(today);
                 monthAgo.setMonth(monthAgo.getMonth() - 1);
-                return expenseDate >= monthAgo;
+                monthAgo.setHours(0, 0, 0, 0);
+                return expenseDate >= monthAgo && expenseDate <= today;
             case 'all':
             default:
                 return true;
         }
     };
 
+    const getFilterLabel = (filter: FilterType): string => {
+        switch (filter) {
+            case 'today':
+                return 'HOJE';
+            case 'week':
+                return 'ÚLTIMOS 7 DIAS';
+            case 'month':
+                return 'ÚLTIMO MÊS';
+            case 'all':
+            default:
+                return 'TODO O PERÍODO';
+        }
+    };
+
     const filteredExpenses = expenses.filter(exp => isDateInRange(exp.date, selectedFilter));
     const totalSpent = filteredExpenses.reduce((acc, exp) => acc + exp.amount, 0);
-    const budget = 5000; // Fixed budget for demo as per image reference
+    const budget = budgetConfig.totalLimit;
     const remaining = budget - totalSpent;
 
     // Filter Stats
     const getCategoryTotal = (cat: ExpenseCategory) => filteredExpenses.filter(e => e.category === cat).reduce((acc, e) => acc + e.amount, 0);
+
+    const getCategoryColor = (cat: ExpenseCategory) => {
+        const colors: Record<ExpenseCategory, { bg: string; icon: string }> = {
+            food: { bg: '#fff7ed', icon: '#f97316' },
+            transport: { bg: '#eff6ff', icon: '#137fec' },
+            accommodation: { bg: '#fef3c7', icon: '#eab308' },
+            activities: { bg: '#f3e8ff', icon: '#a855f7' },
+            shopping: { bg: '#fce7f3', icon: '#ec4899' },
+            others: { bg: '#f3f4f6', icon: '#6b7280' },
+        };
+        return colors[cat] || colors.others;
+    };
+
+    // Get categories with expenses
+    const getActiveCategories = (): ExpenseCategory[] => {
+        const categoriesWithExpenses = new Set<ExpenseCategory>();
+        filteredExpenses.forEach(exp => categoriesWithExpenses.add(exp.category));
+        return Array.from(categoriesWithExpenses);
+    };
+
+    const activeCategories = getActiveCategories();
 
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Orçamento</Text>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setModalVisible(true)}
-                >
-                    <MaterialIcons name="add" size={24} color="#137fec" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                        style={[styles.addButton, { backgroundColor: '#fef3c7' }]}
+                        onPress={createSampleExpenses}
+                    >
+                        <MaterialIcons name="auto-awesome" size={24} color="#eab308" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.addButton, { backgroundColor: '#fee2e2' }]}
+                        onPress={clearAllExpenses}
+                    >
+                        <MaterialIcons name="delete" size={24} color="#ef4444" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={() => setModalVisible(true)}
+                    >
+                        <MaterialIcons name="add" size={24} color="#137fec" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView
@@ -199,7 +398,7 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
 
                     <View style={styles.balanceMeta}>
                         <Text style={styles.balanceMetaText}>Utilizado (Vista): <Text style={{ fontWeight: '700' }}>R$ {totalSpent.toLocaleString('pt-BR')}</Text></Text>
-                        <Text style={styles.balanceMetaTextGray}>Total: R$ 5k</Text>
+                        <Text style={styles.balanceMetaTextGray}>Total: R$ {budgetConfig.totalLimit >= 1000 ? `${(budgetConfig.totalLimit / 1000).toFixed(0)}k` : budgetConfig.totalLimit.toLocaleString('pt-BR')}</Text>
                     </View>
 
                     <View style={styles.globalProgressBg}>
@@ -211,106 +410,233 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
 
                 {/* Category Highlights */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.highlightsScroll}>
-                    <View style={styles.highlightCard}>
-                        <View style={[styles.highlightIcon, { backgroundColor: '#fff7ed' }]}>
-                            <MaterialIcons name="restaurant" size={20} color="#f97316" />
-                        </View>
-                        <Text style={styles.highlightLabel}>ALIMENTAÇÃO</Text>
-                        <Text style={styles.highlightValue}>R$ {getCategoryTotal('food')}</Text>
-                    </View>
+                    {activeCategories.map(cat => {
+                        const total = getCategoryTotal(cat);
+                        const color = getCategoryColor(cat);
+                        const icon = getCategoryIcon(cat);
+                        const name = getCategoryName(cat);
 
-                    <View style={styles.highlightCard}>
-                        <View style={[styles.highlightIcon, { backgroundColor: '#eff6ff' }]}>
-                            <MaterialIcons name="directions-bus" size={20} color="#137fec" />
-                        </View>
-                        <Text style={styles.highlightLabel}>TRANSPORTE</Text>
-                        <Text style={styles.highlightValue}>R$ {getCategoryTotal('transport')}</Text>
-                    </View>
-
-                    <View style={styles.highlightCard}>
-                        <View style={[styles.highlightIcon, { backgroundColor: '#f3e8ff' }]}>
-                            <MaterialIcons name="local-activity" size={20} color="#a855f7" />
-                        </View>
-                        <Text style={styles.highlightLabel}>LAZER</Text>
-                        <Text style={styles.highlightValue}>R$ {getCategoryTotal('activities')}</Text>
-                    </View>
+                        return (
+                            <View key={cat} style={styles.highlightCard}>
+                                <View style={[styles.highlightIcon, { backgroundColor: color.bg }]}>
+                                    <MaterialIcons name={icon} size={20} color={color.icon} />
+                                </View>
+                                <Text style={styles.highlightLabel}>{name.toUpperCase()}</Text>
+                                <Text style={styles.highlightValue}>R$ {total.toLocaleString('pt-BR')}</Text>
+                            </View>
+                        );
+                    })}
                 </ScrollView>
 
                 {/* Distribution */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Distribuição</Text>
-                    <Text style={styles.confLink}>CONFIGURAR</Text>
+                    <TouchableOpacity onPress={handleOpenConfigModal}>
+                        <Text style={styles.confLink}>CONFIGURAR</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.distributionCard}>
-                    {/* Transport */}
-                    <View style={styles.distRow}>
-                        <View style={styles.distLabelRow}>
-                            <View style={[styles.dot, { backgroundColor: '#137fec' }]} />
-                            <Text style={styles.distLabel}>Transporte</Text>
-                        </View>
-                        <Text style={styles.distValue}>50%</Text>
-                    </View>
-                    <View style={styles.distBarBg}>
-                        <View style={[styles.distBarFill, { width: '50%', backgroundColor: '#137fec' }]} />
-                    </View>
+                    {activeCategories.length > 0 ? (
+                        activeCategories.map(cat => {
+                            const total = getCategoryTotal(cat);
+                            const percentage = totalSpent > 0 ? Math.round((total / totalSpent) * 100) : 0;
+                            const color = getCategoryColor(cat);
+                            const name = getCategoryName(cat);
 
-                    {/* Food */}
-                    <View style={styles.distRow}>
-                        <View style={styles.distLabelRow}>
-                            <View style={[styles.dot, { backgroundColor: '#f97316' }]} />
-                            <Text style={styles.distLabel}>Alimentação</Text>
+                            return (
+                                <React.Fragment key={cat}>
+                                    <View style={styles.distRow}>
+                                        <View style={styles.distLabelRow}>
+                                            <View style={[styles.dot, { backgroundColor: color.icon }]} />
+                                            <Text style={styles.distLabel}>{name}</Text>
+                                        </View>
+                                        <Text style={styles.distValue}>{percentage}%</Text>
+                                    </View>
+                                    <View style={styles.distBarBg}>
+                                        <View style={[styles.distBarFill, { width: `${percentage}%`, backgroundColor: color.icon }]} />
+                                    </View>
+                                </React.Fragment>
+                            );
+                        })
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <MaterialIcons name="pie-chart" size={48} color="#d1d5db" />
+                            <Text style={styles.emptyStateText}>Nenhuma despesa cadastrada</Text>
+                            <Text style={styles.emptyStateSubtext}>Adicione despesas para ver a distribuição</Text>
                         </View>
-                        <Text style={styles.distValue}>30%</Text>
-                    </View>
-                    <View style={styles.distBarBg}>
-                        <View style={[styles.distBarFill, { width: '30%', backgroundColor: '#f97316' }]} />
-                    </View>
-
-                    {/* Leisure/Lazer */}
-                    <View style={styles.distRow}>
-                        <View style={styles.distLabelRow}>
-                            <View style={[styles.dot, { backgroundColor: '#a855f7' }]} />
-                            <Text style={styles.distLabel}>Lazer</Text>
-                        </View>
-                        <Text style={styles.distValue}>20%</Text>
-                    </View>
-                    <View style={styles.distBarBg}>
-                        <View style={[styles.distBarFill, { width: '20%', backgroundColor: '#a855f7' }]} />
-                    </View>
+                    )}
                 </View>
 
                 {/* Transactions */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Transações</Text>
                 </View>
-                <Text style={styles.subDate}>HOJE</Text>
+                <Text style={styles.subDate}>{getFilterLabel(selectedFilter)}</Text>
 
-                {filteredExpenses.map(expense => (
-                    <View key={expense.id} style={styles.transactionItem}>
-                        <View style={styles.transIconContainer}>
-                            <MaterialIcons
-                                name={getCategoryIcon(expense.category)}
-                                size={20}
-                                color="#4b5563"
-                            />
-                        </View>
-                        <View style={styles.transInfo}>
-                            <Text style={styles.transTitle}>{expense.description}</Text>
-                            <Text style={styles.transSub}>{getCategoryName(expense.category).toUpperCase()}</Text>
-                        </View>
-                        <Text style={styles.transAmount}>- R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</Text>
+                {filteredExpenses.length > 0 ? (
+                    filteredExpenses.map(expense => (
+                        <TouchableOpacity
+                            key={expense.id}
+                            style={styles.transactionItem}
+                            onPress={() => handleEditExpense(expense)}
+                        >
+                            <View style={styles.transIconContainer}>
+                                <MaterialIcons
+                                    name={getCategoryIcon(expense.category)}
+                                    size={20}
+                                    color="#4b5563"
+                                />
+                            </View>
+                            <View style={styles.transInfo}>
+                                <Text style={styles.transTitle}>{expense.description}</Text>
+                                <Text style={styles.transSub}>{getCategoryName(expense.category).toUpperCase()}</Text>
+                            </View>
+                            <Text style={styles.transAmount}>- R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</Text>
+                            <TouchableOpacity
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteExpense(expense.id);
+                                }}
+                                style={styles.deleteButton}
+                            >
+                                <MaterialIcons name="delete" size={20} color="#ef4444" />
+                            </TouchableOpacity>
+                        </TouchableOpacity>
+                    ))
+                ) : (
+                    <View style={styles.emptyState}>
+                        <MaterialIcons name="receipt" size={48} color="#d1d5db" />
+                        <Text style={styles.emptyStateText}>Nenhuma transação encontrada</Text>
+                        <Text style={styles.emptyStateSubtext}>Adicione despesas com o botão +</Text>
                     </View>
-                ))}
+                )}
 
             </ScrollView>
 
             {/* Add Expense Modal */}
             <Modal
                 animationType="slide"
-                transparent={true}
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
+            >
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                        style={{ flex: 1 }}
+                    >
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>{editingExpenseId ? 'Editar Despesa' : 'Nova Despesa'}</Text>
+                                <TouchableOpacity onPress={() => {
+                                    setModalVisible(false);
+                                    setEditingExpenseId(null);
+                                    setTitle('');
+                                    setAmount('');
+                                    setCategory('others');
+                                    setExpenseDate(new Date());
+                                }}>
+                                    <MaterialIcons name="close" size={24} color="#6b7280" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView
+                                style={styles.modalForm}
+                                showsVerticalScrollIndicator={false}
+                                keyboardShouldPersistTaps="handled"
+                            >
+                                <Text style={styles.inputLabel}>Descrição</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Ex: Café da manhã"
+                                    value={title}
+                                    onChangeText={setTitle}
+                                />
+
+                                <Text style={styles.inputLabel}>Valor (R$)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="0,00"
+                                    keyboardType="numeric"
+                                    value={amount}
+                                    onChangeText={setAmount}
+                                />
+
+                                <Text style={styles.inputLabel}>Categoria</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelector}>
+                                    {(['food', 'transport', 'accommodation', 'shopping', 'activities', 'others'] as ExpenseCategory[]).map(cat => (
+                                        <TouchableOpacity
+                                            key={cat}
+                                            style={[
+                                                styles.categoryChip,
+                                                category === cat && styles.categoryChipActive
+                                            ]}
+                                            onPress={() => setCategory(cat)}
+                                        >
+                                            <Text style={[
+                                                styles.categoryChipText,
+                                                category === cat && styles.categoryChipTextActive
+                                            ]}>
+                                                {getCategoryName(cat)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+
+                                <Text style={styles.inputLabel}>Data</Text>
+                                <TouchableOpacity
+                                    style={styles.dateTimeRow}
+                                    onPress={showDatePickerHandler}
+                                >
+                                    <MaterialIcons name="calendar-today" size={16} color="#137fec" />
+                                    <Text style={styles.dateTimeText}>
+                                        {expenseDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* iOS Date Picker Modal */}
+                                {showDatePicker && Platform.OS === 'ios' && (
+                                    <View style={styles.datePickerContainer}>
+                                        <View style={styles.datePickerHeader}>
+                                            <TouchableOpacity onPress={handleCancelDate}>
+                                                <Text style={styles.datePickerCancel}>Cancelar</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={handleConfirmDate}>
+                                                <Text style={styles.datePickerConfirm}>Confirmar</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <DateTimePicker
+                                            value={tempDate}
+                                            mode="date"
+                                            display="spinner"
+                                            locale="pt-BR"
+                                            onChange={(event, selectedDate) => {
+                                                if (selectedDate) {
+                                                    setTempDate(selectedDate);
+                                                }
+                                            }}
+                                        />
+                                    </View>
+                                )}
+
+                                <TouchableOpacity
+                                    style={styles.saveButton}
+                                    onPress={handleSaveExpense}
+                                >
+                                    <Text style={styles.saveButtonText}>Salvar Despesa</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </View>
+                    </KeyboardAvoidingView>
+                </SafeAreaView>
+            </Modal>
+
+            {/* Budget Config Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={configModalVisible}
+                onRequestClose={() => setConfigModalVisible(false)}
             >
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -318,62 +644,45 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
                 >
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Nova Despesa</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
+                            <Text style={styles.modalTitle}>Configurar Orçamento</Text>
+                            <TouchableOpacity onPress={() => setConfigModalVisible(false)}>
                                 <MaterialIcons name="close" size={24} color="#6b7280" />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.modalForm}>
-                            <Text style={styles.inputLabel}>Descrição</Text>
+                            <Text style={styles.inputLabel}>LIMITE TOTAL (R$)</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Ex: Café da manhã"
-                                value={title}
-                                onChangeText={setTitle}
-                            />
-
-                            <Text style={styles.inputLabel}>Valor (R$)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="0,00"
+                                placeholder="5000"
                                 keyboardType="numeric"
-                                value={amount}
-                                onChangeText={setAmount}
+                                value={tempLimit}
+                                onChangeText={setTempLimit}
                             />
 
-                            <Text style={styles.inputLabel}>Categoria</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelector}>
-                                {(['food', 'transport', 'accommodation', 'shopping', 'activities', 'others'] as ExpenseCategory[]).map(cat => (
-                                    <TouchableOpacity
-                                        key={cat}
-                                        style={[
-                                            styles.categoryChip,
-                                            category === cat && styles.categoryChipActive
-                                        ]}
-                                        onPress={() => setCategory(cat)}
-                                    >
-                                        <Text style={[
-                                            styles.categoryChipText,
-                                            category === cat && styles.categoryChipTextActive
-                                        ]}>
-                                            {getCategoryName(cat)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
+                            <Text style={styles.inputLabel}>ALERTAS</Text>
+                            <View style={styles.switchRow}>
+                                <Text style={styles.switchLabel}>Avisar quando atingir 80%</Text>
+                                <Switch
+                                    value={tempAlertEnabled}
+                                    onValueChange={setTempAlertEnabled}
+                                    trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
+                                    thumbColor={tempAlertEnabled ? '#137fec' : '#f4f3f4'}
+                                />
+                            </View>
 
                             <TouchableOpacity
                                 style={styles.saveButton}
-                                onPress={handleSaveExpense}
+                                onPress={handleSaveBudgetConfig}
                             >
-                                <Text style={styles.saveButtonText}>Salvar Despesa</Text>
+                                <Text style={styles.saveButtonText}>Salvar</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
-        </SafeAreaView>
+
+        </SafeAreaView >
     );
 };
 
@@ -650,6 +959,29 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#ef4444',
     },
+    deleteButton: {
+        marginLeft: 8,
+        padding: 8,
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 48,
+        paddingHorizontal: 24,
+    },
+    emptyStateText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#6b7280',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    emptyStateSubtext: {
+        fontSize: 14,
+        color: '#9ca3af',
+        marginTop: 8,
+        textAlign: 'center',
+    },
 
     // Modal Styles
     modalOverlay: {
@@ -721,6 +1053,40 @@ const styles = StyleSheet.create({
     categoryChipTextActive: {
         color: '#137fec',
     },
+    datePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#f9fafb',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 20,
+    },
+    datePickerText: {
+        fontSize: 16,
+        color: '#111418',
+        fontWeight: '500',
+    },
+    dateTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    dateTimeText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#111418',
+        flex: 1,
+    },
     saveButton: {
         backgroundColor: '#137fec',
         paddingVertical: 16,
@@ -733,6 +1099,72 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#fff',
+    },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        backgroundColor: '#f9fafb',
+        borderRadius: 12,
+        marginBottom: 24,
+    },
+    switchLabel: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#111418',
+    },
+    pickerModal: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: 20,
+        width: '100%',
+        position: 'absolute',
+        bottom: 0,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    pickerCancel: {
+        fontSize: 16,
+        color: '#6b7280',
+    },
+    pickerConfirm: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#137fec',
+    },
+    datePickerContainer: {
+        backgroundColor: '#f9fafb',
+        borderRadius: 12,
+        marginTop: 12,
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    datePickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    datePickerCancel: {
+        fontSize: 16,
+        color: '#6b7280',
+    },
+    datePickerConfirm: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#137fec',
     },
 });
 
