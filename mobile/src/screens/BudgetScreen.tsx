@@ -19,6 +19,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ExpensesStorage } from '../utils/storage';
 import { BudgetConfigStorage, BudgetConfig } from '../utils/budgetStorage';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { CustomCategory, CategoryStorage } from '../utils/categoryStorage';
+import LineChart from 'react-native-chart-kit/dist/line-chart';
 
 type BudgetNavigationProp = BottomTabNavigationProp<MainTabParamList, 'Budget'>;
 
@@ -46,20 +48,52 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
     // Form State
     const [title, setTitle] = React.useState('');
     const [amount, setAmount] = React.useState('');
-    const [category, setCategory] = React.useState<ExpenseCategory>('others');
+    const [category, setCategory] = React.useState<ExpenseCategory | string>('others');
     const [expenseDate, setExpenseDate] = React.useState<Date>(new Date());
     const [showDatePicker, setShowDatePicker] = React.useState(false);
     const [tempDate, setTempDate] = React.useState<Date>(new Date());
     const [editingExpenseId, setEditingExpenseId] = React.useState<string | null>(null);
 
+    // Custom Categories State
+    const [customCategories, setCustomCategories] = React.useState<CustomCategory[]>([]);
+    const [categoryModalVisible, setCategoryModalVisible] = React.useState(false);
+    const [newCategoryName, setNewCategoryName] = React.useState('');
+    const [selectedIcon, setSelectedIcon] = React.useState('category');
+    const [selectedColor, setSelectedColor] = React.useState('#6b7280');
+
     React.useEffect(() => {
         loadExpenses();
         loadBudgetConfig();
+        loadCustomCategories();
     }, []);
 
     const loadBudgetConfig = async () => {
         const config = await BudgetConfigStorage.get();
         setBudgetConfig(config);
+    };
+
+    const loadCustomCategories = async () => {
+        const categories = await CategoryStorage.get();
+        setCustomCategories(categories);
+    };
+
+    const handleSaveCustomCategory = async () => {
+        if (!newCategoryName.trim()) {
+            Alert.alert('Erro', 'Informe o nome da categoria');
+            return;
+        }
+
+        const newCategory = await CategoryStorage.add({
+            name: newCategoryName.trim(),
+            icon: selectedIcon,
+            color: selectedColor,
+        });
+
+        setCustomCategories([...customCategories, newCategory]);
+        setCategoryModalVisible(false);
+        setNewCategoryName('');
+        setSelectedIcon('category');
+        setSelectedColor('#6b7280');
     };
 
     const loadExpenses = async () => {
@@ -87,26 +121,57 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
 
     const createSampleExpenses = async () => {
         const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const fiveDaysAgo = new Date(today);
-        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
-        const tenDaysAgo = new Date(today);
-        tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
-        const twentyDaysAgo = new Date(today);
-        twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
 
         const sampleExpenses: Expense[] = [
-            { id: '1', tripId: '1', description: 'Almoço Hoje', category: 'food', amount: 50, date: today.toISOString() },
-            { id: '2', tripId: '1', description: 'Café Ontem', category: 'food', amount: 15, date: yesterday.toISOString() },
-            { id: '3', tripId: '1', description: 'Uber 5 dias', category: 'transport', amount: 30, date: fiveDaysAgo.toISOString() },
-            { id: '4', tripId: '1', description: 'Hotel 10 dias', category: 'accommodation', amount: 200, date: tenDaysAgo.toISOString() },
-            { id: '5', tripId: '1', description: 'Compras 20 dias', category: 'shopping', amount: 120, date: twentyDaysAgo.toISOString() },
+            // Alimentação (5 transações - R$ 300)
+            { id: '1', tripId: '1', description: 'Restaurante Italiano', category: 'food', amount: 85, date: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '2', tripId: '1', description: 'Café da Manhã', category: 'food', amount: 25, date: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '3', tripId: '1', description: 'Lanche', category: 'food', amount: 15, date: new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '4', tripId: '1', description: 'Jantar Fast Food', category: 'food', amount: 45, date: new Date(today.getTime() - 12 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '5', tripId: '1', description: 'Supermercado', category: 'food', amount: 130, date: new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Transporte (3 - R$ 150)
+            { id: '6', tripId: '1', description: 'Uber', category: 'transport', amount: 35, date: new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '7', tripId: '1', description: 'Combustível', category: 'transport', amount: 80, date: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '8', tripId: '1', description: 'Pedágio', category: 'transport', amount: 35, date: new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Hospedagem (1 - R$ 800)
+            { id: '9', tripId: '1', description: 'Hotel 3 Diárias', category: 'accommodation', amount: 800, date: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Atividades (4 - R$ 400)
+            { id: '10', tripId: '1', description: 'Ingresso Museu', category: 'activities', amount: 60, date: new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '11', tripId: '1', description: 'Passeio Barco', category: 'activities', amount: 150, date: new Date(today.getTime() - 9 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '12', tripId: '1', description: 'Cinema', category: 'activities', amount: 70, date: new Date(today.getTime() - 16 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '13', tripId: '1', description: 'Show Musical', category: 'activities', amount: 120, date: new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Saúde (2 - R$ 200)
+            { id: '14', tripId: '1', description: 'Farmácia', category: 'health', amount: 85, date: new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '15', tripId: '1', description: 'Seguro Viagem', category: 'health', amount: 115, date: new Date(today.getTime() - 18 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Compras (3 - R$ 250)
+            { id: '16', tripId: '1', description: 'Souvenirs', category: 'shopping', amount: 120, date: new Date(today.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '17', tripId: '1', description: 'Roupa Praia', category: 'shopping', amount: 80, date: new Date(today.getTime() - 11 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '18', tripId: '1', description: 'Livro', category: 'shopping', amount: 50, date: new Date(today.getTime() - 22 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Lazer (2 - R$ 180)
+            { id: '19', tripId: '1', description: 'Spa Day', category: 'leisure', amount: 120, date: new Date(today.getTime() - 13 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '20', tripId: '1', description: 'Jogo Arcade', category: 'leisure', amount: 60, date: new Date(today.getTime() - 25 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Emergências (1 - R$ 150)
+            { id: '21', tripId: '1', description: 'Conserto Mala', category: 'emergency', amount: 150, date: new Date(today.getTime() - 17 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Presentes (2 - R$ 140)
+            { id: '22', tripId: '1', description: 'Presente Família', category: 'gifts', amount: 90, date: new Date(today.getTime() - 19 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '23', tripId: '1', description: 'Lembrança', category: 'gifts', amount: 50, date: new Date(today.getTime() - 27 * 24 * 60 * 60 * 1000).toISOString() },
+
+            // Outros (2 - R$ 100)
+            { id: '24', tripId: '1', description: 'Taxa WiFi', category: 'others', amount: 40, date: new Date(today.getTime() - 21 * 24 * 60 * 60 * 1000).toISOString() },
+            { id: '25', tripId: '1', description: 'Gorjeta', category: 'others', amount: 60, date: new Date(today.getTime() - 28 * 24 * 60 * 60 * 1000).toISOString() },
         ];
 
         setExpenses(sampleExpenses);
         await ExpensesStorage.set(sampleExpenses);
-        Alert.alert('Pronto!', 'Despesas de exemplo criadas com datas variadas');
+        Alert.alert('Sucesso', `${sampleExpenses.length} despesas criadas!`);
     };
 
     const handleDeleteExpense = async (expenseId: string) => {
@@ -231,28 +296,50 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
         setConfigModalVisible(false);
     };
 
-    const getCategoryIcon = (cat: ExpenseCategory): keyof typeof MaterialIcons.glyphMap => {
-        const map: Record<ExpenseCategory, string> = {
+    const getCategoryIcon = (cat: ExpenseCategory | string): keyof typeof MaterialIcons.glyphMap => {
+        const categoryIcons: Record<ExpenseCategory, string> = {
             food: 'restaurant',
-            transport: 'flight',
+            transport: 'directions-bus',
             accommodation: 'hotel',
             activities: 'local-activity',
             shopping: 'shopping-bag',
-            others: 'attach-money',
+            health: 'health-and-safety',
+            leisure: 'sports-esports',
+            emergency: 'warning',
+            gifts: 'card-giftcard',
+            others: 'category',
         };
-        return (map[cat] as keyof typeof MaterialIcons.glyphMap) || 'attach-money';
+
+        // Check if it's a custom category
+        const customCat = customCategories.find(c => c.id === cat);
+        if (customCat) {
+            return customCat.icon as keyof typeof MaterialIcons.glyphMap;
+        }
+
+        return (categoryIcons[cat as ExpenseCategory] as keyof typeof MaterialIcons.glyphMap) || 'category';
     };
 
-    const getCategoryName = (cat: ExpenseCategory) => {
-        const map: Record<ExpenseCategory, string> = {
+    const getCategoryName = (cat: ExpenseCategory | string) => {
+        const categoryNames: Record<ExpenseCategory, string> = {
             food: 'Alimentação',
             transport: 'Transporte',
             accommodation: 'Hospedagem',
             activities: 'Atividades',
             shopping: 'Compras',
+            health: 'Saúde',
+            leisure: 'Lazer',
+            emergency: 'Emergências',
+            gifts: 'Presentes',
             others: 'Outros',
         };
-        return map[cat];
+
+        // Check if it's a custom category
+        const customCat = customCategories.find(c => c.id === cat);
+        if (customCat) {
+            return customCat.name;
+        }
+
+        return categoryNames[cat as ExpenseCategory] || cat;
     };
 
     // Date filtering logic
@@ -303,25 +390,82 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
     const remaining = budget - totalSpent;
 
     // Filter Stats
-    const getCategoryTotal = (cat: ExpenseCategory) => filteredExpenses.filter(e => e.category === cat).reduce((acc, e) => acc + e.amount, 0);
+    const getCategoryTotal = (cat: ExpenseCategory | string) => filteredExpenses.filter(e => e.category === cat).reduce((acc, e) => acc + e.amount, 0);
 
-    const getCategoryColor = (cat: ExpenseCategory) => {
-        const colors: Record<ExpenseCategory, { bg: string; icon: string }> = {
-            food: { bg: '#fff7ed', icon: '#f97316' },
-            transport: { bg: '#eff6ff', icon: '#137fec' },
+    const getCategoryColor = (cat: ExpenseCategory | string) => {
+        const categoryColors: Record<ExpenseCategory, { bg: string; icon: string }> = {
+            food: { bg: '#fee2e2', icon: '#ef4444' },
+            transport: { bg: '#dbeafe', icon: '#3b82f6' },
             accommodation: { bg: '#fef3c7', icon: '#eab308' },
-            activities: { bg: '#f3e8ff', icon: '#a855f7' },
+            activities: { bg: '#e9d5ff', icon: '#a855f7' },
             shopping: { bg: '#fce7f3', icon: '#ec4899' },
-            others: { bg: '#f3f4f6', icon: '#6b7280' },
+            health: { bg: '#ccfbf1', icon: '#14b8a6' },
+            leisure: { bg: '#ddd6fe', icon: '#8b5cf6' },
+            emergency: { bg: '#fed7aa', icon: '#f97316' },
+            gifts: { bg: '#fbcfe8', icon: '#db2777' },
+            others: { bg: '#e7e5e4', icon: '#57534e' },
         };
-        return colors[cat] || colors.others;
+
+        // Check if it's a custom category
+        const customCat = customCategories.find(c => c.id === cat);
+        if (customCat) {
+            // Generate a light background from the custom color
+            return {
+                bg: customCat.color + '20', // Add 20 for 12.5% opacity
+                icon: customCat.color
+            };
+        }
+
+        return categoryColors[cat as ExpenseCategory] || categoryColors.others;
     };
 
     // Get categories with expenses
-    const getActiveCategories = (): ExpenseCategory[] => {
-        const categoriesWithExpenses = new Set<ExpenseCategory>();
+    const getActiveCategories = (): (ExpenseCategory | string)[] => {
+        const categoriesWithExpenses = new Set<ExpenseCategory | string>();
         filteredExpenses.forEach(exp => categoriesWithExpenses.add(exp.category));
         return Array.from(categoriesWithExpenses);
+    };
+
+    // Chart data processing
+    const dailyExpensesData = React.useMemo(() => {
+        const dailyData: { [key: string]: number } = {};
+
+        filteredExpenses.forEach(exp => {
+            const date = new Date(exp.date);
+            const dateKey = `${date.getDate()}/${date.getMonth() + 1}`;
+            dailyData[dateKey] = (dailyData[dateKey] || 0) + exp.amount;
+        });
+
+        const sortedDates = Object.keys(dailyData).sort((a, b) => {
+            const [dayA, monthA] = a.split('/').map(Number);
+            const [dayB, monthB] = b.split('/').map(Number);
+            return monthA !== monthB ? monthA - monthB : dayA - dayB;
+        });
+
+        return {
+            labels: sortedDates,
+            datasets: [{
+                data: sortedDates.map(date => dailyData[date])
+            }]
+        };
+    }, [filteredExpenses]);
+
+
+    const chartConfig = {
+        backgroundColor: '#fff',
+        backgroundGradientFrom: '#fff',
+        backgroundGradientTo: '#fff',
+        decimalPlaces: 0,
+        color: (opacity = 1) => `rgba(19, 127, 236, ${opacity})`,
+        labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+        style: {
+            borderRadius: 16
+        },
+        propsForDots: {
+            r: '4',
+            strokeWidth: '2',
+            stroke: '#137fec'
+        }
     };
 
     const activeCategories = getActiveCategories();
@@ -468,6 +612,38 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
                     )}
                 </View>
 
+                {/* Line Chart - Daily Expenses */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Gastos ao Longo do Tempo</Text>
+                </View>
+                <View style={styles.chartCard}>
+                    {filteredExpenses.length > 0 && dailyExpensesData.labels.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                            <LineChart
+                                data={dailyExpensesData}
+                                width={Math.max(350, dailyExpensesData.labels.length * 40)}
+                                height={220}
+                                chartConfig={chartConfig}
+                                bezier
+                                style={styles.chart}
+                                withInnerLines={false}
+                                withOuterLines={true}
+                                withVerticalLines={false}
+                                withHorizontalLines={true}
+                                withShadow={false}
+                                withDots={true}
+                                fromZero={true}
+                            />
+                        </ScrollView>
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <MaterialIcons name="show-chart" size={48} color="#d1d5db" />
+                            <Text style={styles.emptyStateText}>Sem dados no período</Text>
+                            <Text style={styles.emptyStateSubtext}>Adicione despesas para visualizar</Text>
+                        </View>
+                    )}
+                </View>
+
                 {/* Transactions */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Transações</Text>
@@ -563,8 +739,9 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
                                 />
 
                                 <Text style={styles.inputLabel}>Categoria</Text>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelector}>
-                                    {(['food', 'transport', 'accommodation', 'shopping', 'activities', 'others'] as ExpenseCategory[]).map(cat => (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScrollView}>
+                                    {/* Default Categories (except Others) */}
+                                    {['food', 'transport', 'accommodation', 'activities', 'shopping', 'health', 'leisure', 'emergency', 'gifts'].map((cat) => (
                                         <TouchableOpacity
                                             key={cat}
                                             style={[
@@ -577,10 +754,57 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
                                                 styles.categoryChipText,
                                                 category === cat && styles.categoryChipTextActive
                                             ]}>
-                                                {getCategoryName(cat)}
+                                                {getCategoryName(cat as ExpenseCategory)}
                                             </Text>
                                         </TouchableOpacity>
                                     ))}
+
+                                    {/* Custom Categories */}
+                                    {customCategories.map((cat) => (
+                                        <TouchableOpacity
+                                            key={cat.id}
+                                            style={[
+                                                styles.categoryChip,
+                                                category === cat.id && styles.categoryChipActive,
+                                                { borderColor: cat.color }
+                                            ]}
+                                            onPress={() => setCategory(cat.id)}
+                                        >
+                                            <Text style={[
+                                                styles.categoryChipText,
+                                                category === cat.id && styles.categoryChipTextActive
+                                            ]}>
+                                                {cat.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+
+                                    {/* Others Category */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.categoryChip,
+                                            category === 'others' && styles.categoryChipActive
+                                        ]}
+                                        onPress={() => setCategory('others')}
+                                    >
+                                        <Text style={[
+                                            styles.categoryChipText,
+                                            category === 'others' && styles.categoryChipTextActive
+                                        ]}>
+                                            {getCategoryName('others' as ExpenseCategory)}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Add New Category Button */}
+                                    <TouchableOpacity
+                                        style={styles.addCategoryButton}
+                                        onPress={() => {
+                                            setModalVisible(false);
+                                            setTimeout(() => setCategoryModalVisible(true), 300);
+                                        }}
+                                    >
+                                        <MaterialIcons name="add" size={20} color="#137fec" />
+                                    </TouchableOpacity>
                                 </ScrollView>
 
                                 <Text style={styles.inputLabel}>Data</Text>
@@ -680,6 +904,81 @@ const BudgetScreen: React.FC<Props> = ({ navigation }) => {
                         </View>
                     </View>
                 </KeyboardAvoidingView>
+            </Modal>
+
+            {/* New Category Modal */}
+            <Modal
+                animationType="slide"
+                visible={categoryModalVisible}
+                onRequestClose={() => setCategoryModalVisible(false)}
+            >
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Nova Categoria</Text>
+                            <TouchableOpacity onPress={() => {
+                                setCategoryModalVisible(false);
+                                setNewCategoryName('');
+                                setSelectedIcon('category');
+                                setSelectedColor('#6b7280');
+                            }}>
+                                <MaterialIcons name="close" size={24} color="#6b7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalForm}>
+                            <Text style={styles.inputLabel}>Nome da Categoria</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ex: Diversão, Educação..."
+                                value={newCategoryName}
+                                onChangeText={setNewCategoryName}
+                            />
+
+                            <Text style={styles.inputLabel}>Ícone</Text>
+                            <View style={styles.iconGrid}>
+                                {['category', 'local-dining', 'directions-car', 'flight', 'hotel', 'shopping-cart', 'local-hospital', 'sports-esports', 'warning', 'card-giftcard', 'wifi', 'school', 'fitness-center', 'pets', 'local-cafe', 'movie'].map((icon) => (
+                                    <TouchableOpacity
+                                        key={icon}
+                                        style={[
+                                            styles.iconOption,
+                                            selectedIcon === icon && styles.iconOptionActive
+                                        ]}
+                                        onPress={() => setSelectedIcon(icon)}
+                                    >
+                                        <MaterialIcons name={icon as any} size={24} color={selectedIcon === icon ? '#137fec' : '#6b7280'} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.inputLabel}>Cor</Text>
+                            <View style={styles.colorGrid}>
+                                {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'].map((color) => (
+                                    <TouchableOpacity
+                                        key={color}
+                                        style={[
+                                            styles.colorOption,
+                                            { backgroundColor: color },
+                                            selectedColor === color && styles.colorOptionActive
+                                        ]}
+                                        onPress={() => setSelectedColor(color)}
+                                    >
+                                        {selectedColor === color && (
+                                            <MaterialIcons name="check" size={20} color="#fff" />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSaveCustomCategory}
+                            >
+                                <Text style={styles.saveButtonText}>Criar Categoria</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </SafeAreaView>
             </Modal>
 
         </SafeAreaView >
@@ -1040,6 +1339,8 @@ const styles = StyleSheet.create({
         marginRight: 8,
         borderWidth: 1,
         borderColor: '#e5e7eb',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     categoryChipActive: {
         backgroundColor: '#eff6ff',
@@ -1165,6 +1466,73 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#137fec',
+    },
+    categoryScrollView: {
+        marginBottom: 16,
+    },
+    addCategoryButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: '#137fec',
+        borderStyle: 'dashed',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    iconGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 24,
+    },
+    iconOption: {
+        width: 56,
+        height: 56,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconOptionActive: {
+        borderColor: '#137fec',
+        backgroundColor: '#eff6ff',
+    },
+    colorGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 24,
+    },
+    colorOption: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    colorOptionActive: {
+        borderWidth: 3,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    chartCard: {
+        backgroundColor: '#fff',
+        marginHorizontal: 20,
+        marginBottom: 20,
+        borderRadius: 20,
+        padding: 16,
+        alignItems: 'center',
+    },
+    chart: {
+        marginVertical: 8,
+        borderRadius: 16,
     },
 });
 

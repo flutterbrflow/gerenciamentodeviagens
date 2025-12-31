@@ -41,14 +41,14 @@ export interface Transaction {
   icon: string;
 }
 
-export type ExpenseCategory = 'food' | 'transport' | 'accommodation' | 'activities' | 'shopping' | 'others';
+export type ExpenseCategory = 'food' | 'transport' | 'accommodation' | 'activities' | 'shopping' | 'health' | 'leisure' | 'emergency' | 'gifts' | 'others';
 
 export interface Expense {
   id: string;
   tripId: string;
   description: string;
   amount: number;
-  category: ExpenseCategory;
+  category: ExpenseCategory | string; // Support both default and custom categories
   date: string;
 }
 
