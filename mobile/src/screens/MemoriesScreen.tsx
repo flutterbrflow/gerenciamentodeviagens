@@ -12,6 +12,8 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Platform,
+    FlatList,
+    Dimensions,
 } from 'react-native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, Trip } from '../types';
@@ -33,6 +35,8 @@ interface Memory {
 }
 
 const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+
     const [memories, setMemories] = useState<Memory[]>([]);
     const [trips, setTrips] = useState<Trip[]>([]);
 
@@ -41,7 +45,24 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [memoryTitle, setMemoryTitle] = useState('');
     const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+
+    // Full-screen viewer state
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [selectedMemoryIndex, setSelectedMemoryIndex] = useState<number | null>(null);
+    const [selectedTripName, setSelectedTripName] = useState<string | null>(null);
     const [tempDate, setTempDate] = useState<string | null>(null);
+
+    // Group memories by trip
+    const memoriesByTrip = React.useMemo(() => {
+        return memories.reduce((acc, memory) => {
+            const tripName = memory.trip || 'Sem viagem';
+            if (!acc[tripName]) {
+                acc[tripName] = [];
+            }
+            acc[tripName].push(memory);
+            return acc;
+        }, {} as Record<string, Memory[]>);
+    }, [memories]);
 
     useEffect(() => {
         loadMemories();
@@ -211,16 +232,37 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.grid}>
-                    {memories.map(memory => (
-                        <TouchableOpacity key={memory.id} style={styles.memoryCard} activeOpacity={0.9}>
-                            <Image source={{ uri: memory.image }} style={styles.memoryImage} resizeMode="cover" />
-                            <View style={styles.memoryOverlay} />
-                            <View style={styles.memoryInfo}>
-                                <Text style={styles.memoryTrip}>{memory.trip}</Text>
-                                <Text style={styles.memoryDate}>{memory.date}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                    {Object.keys(memoriesByTrip).map(tripName => {
+                        const tripMemories = memoriesByTrip[tripName];
+                        const coverPhoto = tripMemories[0]; // First photo as cover
+
+                        return (
+                            <TouchableOpacity
+                                key={tripName}
+                                style={styles.tripCard}
+                                activeOpacity={0.9}
+                                onPress={() => {
+                                    setSelectedTripName(tripName);
+                                    setSelectedMemoryIndex(0);
+                                    setViewerVisible(true);
+                                }}
+                            >
+                                <Image
+                                    source={{ uri: coverPhoto.image }}
+                                    style={styles.tripCoverImage}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.tripOverlay} />
+                                <View style={styles.tripInfo}>
+                                    <Text style={styles.tripName}>{tripName}</Text>
+                                    <View style={styles.photoCount}>
+                                        <MaterialIcons name="photo" size={16} color="#fff" />
+                                        <Text style={styles.photoCountText}>{tripMemories.length}</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
                 {/* Empty State (commented out since we have mock data) */}
@@ -304,6 +346,71 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
+
+            {/* Full-Screen Photo Viewer */}
+            <Modal
+                animationType="fade"
+                visible={viewerVisible}
+                onRequestClose={() => setViewerVisible(false)}
+            >
+                <View style={styles.viewerContainer}>
+                    {selectedMemoryIndex !== null && selectedTripName && memoriesByTrip[selectedTripName] && (
+                        <>
+                            {/* Close Button */}
+                            <TouchableOpacity
+                                style={styles.viewerCloseButton}
+                                onPress={() => setViewerVisible(false)}
+                                activeOpacity={0.8}
+                            >
+                                <MaterialIcons name="close" size={32} color="#fff" />
+                            </TouchableOpacity>
+
+                            {/* Photo Counter */}
+                            <View style={styles.viewerCounter}>
+                                <Text style={styles.counterText}>
+                                    {selectedMemoryIndex + 1} / {memoriesByTrip[selectedTripName].length}
+                                </Text>
+                            </View>
+
+                            {/* Swipeable Photos */}
+                            <FlatList
+                                data={memoriesByTrip[selectedTripName]}
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                keyExtractor={(item) => item.id}
+                                initialScrollIndex={selectedMemoryIndex}
+                                getItemLayout={(_, index) => ({
+                                    length: SCREEN_WIDTH,
+                                    offset: SCREEN_WIDTH * index,
+                                    index,
+                                })}
+                                onMomentumScrollEnd={(e) => {
+                                    const index = Math.round(
+                                        e.nativeEvent.contentOffset.x / SCREEN_WIDTH
+                                    );
+                                    setSelectedMemoryIndex(index);
+                                }}
+                                renderItem={({ item }) => (
+                                    <View style={[styles.viewerSlide, { width: SCREEN_WIDTH }]}>
+                                        <Image
+                                            source={{ uri: item.image }}
+                                            style={styles.viewerImage}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                )}
+                            />
+
+                            {/* Info Overlay */}
+                            <View style={styles.viewerFooter}>
+                                <Text style={styles.viewerTrip}>{memoriesByTrip[selectedTripName][selectedMemoryIndex].trip}</Text>
+                                <Text style={styles.viewerDate}>{memoriesByTrip[selectedTripName][selectedMemoryIndex].date}</Text>
+                            </View>
+                        </>
+                    )}
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -348,37 +455,47 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         gap: 12,
     },
-    memoryCard: {
+    tripCard: {
         width: '48%',
         aspectRatio: 1,
-        borderRadius: 16,
+        borderRadius: 18,
         overflow: 'hidden',
-        position: 'relative',
+        marginBottom: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
-    memoryImage: {
+    tripCoverImage: {
         width: '100%',
         height: '100%',
     },
-    memoryOverlay: {
+    tripOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
     },
-    memoryInfo: {
+    tripInfo: {
         position: 'absolute',
         bottom: 12,
         left: 12,
         right: 12,
     },
-    memoryTrip: {
-        fontSize: 13,
+    tripName: {
+        fontSize: 16,
         fontWeight: '700',
         color: '#fff',
-        marginBottom: 2,
+        marginBottom: 4,
     },
-    memoryDate: {
-        fontSize: 10,
+    photoCount: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    photoCountText: {
+        fontSize: 14,
         fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: '#fff',
     },
     emptyContainer: {
         alignItems: 'center',
@@ -508,6 +625,66 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+    },
+    // Viewer Styles
+    viewerContainer: {
+        flex: 1,
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    viewerCloseButton: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        width: 50,
+        height: 50,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    viewerCounter: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        borderRadius: 25,
+        zIndex: 10,
+        height: 50,
+        justifyContent: 'center',
+    },
+    counterText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    viewerSlide: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    viewerImage: {
+        width: '100%',
+        height: '100%',
+    },
+    viewerFooter: {
+        position: 'absolute',
+        bottom: 40,
+        left: 20,
+        right: 20,
+    },
+    viewerTrip: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    viewerDate: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.8)',
     },
 });
 

@@ -25,6 +25,18 @@
   - Configuração de limite e alertas
   - Edição e exclusão de despesas
 
+## 📸 Memórias (Memories)
+- **Upload de fotos:** Câmera ou galeria
+- **Agrupamento inteligente:** Fotos organizadas por viagem
+- **Trip cards:** Cards com foto de capa e contador
+- **Full-screen viewer:** Visualizador profissional com swipe
+- **Galeria filtrada:** Exibe apenas fotos da viagem selecionada
+- **EXIF reading:** Leitura automática de data/localização
+
+---
+
+Status: ✅ Em produção
+
 ## 4. Perfil
 - Upload e persistência de foto de avatar.
 - Estatísticas de viajante (Países, Viagens, Fotos).
