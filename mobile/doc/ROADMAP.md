@@ -48,6 +48,33 @@ Este documento detalha as próximas melhorias recomendadas para o aplicativo de 
 
 ## 3. Funcionalidades de Orçamento 💰
 
+### ✅ Implementado (Dezembro 2024)
+- ✅ **Sistema de Categorias Customizadas**
+  - 9 categorias padrão (Alimentação, Transporte, Hospedagem, Atividades, Compras, Saúde, Lazer, Emergências, Presentes)
+  - Criação de categorias customizadas (nome, ícone, cor)
+  - Persistência com AsyncStorage
+  - Ordenação inteligente (padrão → custom → Outros)
+
+- ✅ **Gráfico de Tendências**
+  - LineChart com dados diários
+  - Responsivo aos filtros de data
+  - Scroll horizontal para muitos dados
+  - Curva suavizada (bezier)
+
+- ✅ **Configuração de Orçamento Global**
+  - Definir limite total
+  - Alertas de 80% e 100%
+  - Saldo disponível dinâmico
+
+- ✅ **Filtros por Período**
+  - Hoje, Semana, Mês, Todo Período
+  - Atualização de todos componentes
+
+- ✅ **Distribuição por Categoria**
+  - Gráfico  de barras com percentagens
+  - Apenas categorias ativas
+  - Empty states
+
 ### Alta Prioridade
 - **Configuração de Orçamento por Categoria**
   - Permitir que usuário defina % ou valor fixo por categoria

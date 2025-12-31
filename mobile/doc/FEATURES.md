@@ -18,7 +18,12 @@
 - **Itinerário**: Linha do tempo com eventos (voo, hotel, passeios).
 - **Reservas**: Lista de comprovantes e reservas.
 - **Tarefas**: Checklist interativo (Check-in, Malas, etc).
-- **Orçamento** (Em desenvolvimento): Controle de gastos.
+- **Orçamento** (✅ Completo):
+  - 9 categorias padrão + customizadas
+  - Gráfico de tendências temporais
+  - Filtros por período (Hoje, Semana, Mês, Todos)
+  - Configuração de limite e alertas
+  - Edição e exclusão de despesas
 
 ## 4. Perfil
 - Upload e persistência de foto de avatar.

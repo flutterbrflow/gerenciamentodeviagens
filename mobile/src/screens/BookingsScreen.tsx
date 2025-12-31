@@ -39,17 +39,12 @@ const BookingsScreen: React.FC<Props> = ({ navigation }) => {
     const [bookings, setBookings] = useState<Booking[]>([]);
 
     const loadBookings = async () => {
-        console.log('🔄 [DEBUG] Carregando reservas...');
         const saved = await AsyncStorage.getItem('travelease_bookings');
-        console.log('📂 [DEBUG] Dados do AsyncStorage:', saved);
 
         if (saved) {
             const parsed = JSON.parse(saved);
-            console.log('📋 [DEBUG] Reservas carregadas:', parsed.length, 'itens');
-            console.log('📋 [DEBUG] Dados:', JSON.stringify(parsed, null, 2));
             setBookings(parsed);
         } else {
-            console.log('⚠️ [DEBUG] Nenhum dado salvo, usando dados mockados');
             // Mock data
             const mockBookings: Booking[] = [
                 {

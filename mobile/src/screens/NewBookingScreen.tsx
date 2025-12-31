@@ -79,7 +79,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
     // Carrega dados ao editar
     React.useEffect(() => {
         if (editingBooking && editingBooking.data) {
-            console.log('📝 [DEBUG] Carregando dados para edição:', editingBooking);
             const data = editingBooking.data;
 
             // FLIGHT
@@ -133,7 +132,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
                     const nextDay = new Date(tempValue);
                     nextDay.setDate(nextDay.getDate() + 1);
                     setReturnDate(nextDay);
-                    console.log('⚠️ [DEBUG] Data de volta ajustada para:', nextDay);
                 }
                 break;
             case 'departureTime':
@@ -160,7 +158,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
                     const nextDay = new Date(tempValue);
                     nextDay.setDate(nextDay.getDate() + 1);
                     setCheckOutDate(nextDay);
-                    console.log('⚠️ [DEBUG] Data de checkout ajustada para:', nextDay);
                 }
                 break;
             case 'checkOut':
@@ -181,7 +178,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
                     const nextDay = new Date(tempValue);
                     nextDay.setDate(nextDay.getDate() + 1);
                     setReturnCarDate(nextDay);
-                    console.log('⚠️ [DEBUG] Data de devolução ajustada para:', nextDay);
                 }
                 break;
             case 'pickupTime':
@@ -212,8 +208,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
     };
 
     const handleSave = async () => {
-        console.log('🔍 [DEBUG] Iniciando salvamento...');
-        console.log('🔍 [DEBUG] Categoria selecionada:', selectedCategory);
 
         let newBooking: any = {
             id: editingBooking ? editingBooking.id : Date.now().toString(),
@@ -224,7 +218,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
 
         // Validações e dados específicos por tipo
         if (selectedCategory === 'flight') {
-            console.log('✈️ [DEBUG] Validando voo...');
             if (!originCity.trim() || !destCity.trim()) {
                 Alert.alert('Atenção', 'Por favor, preencha origem e destino.');
                 return;
@@ -257,7 +250,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
                 flightNumber,
             };
         } else if (selectedCategory === 'hotel') {
-            console.log('🏨 [DEBUG] Validando hotel...');
             if (!hotelName.trim()) {
                 Alert.alert('Atenção', 'Por favor, preencha o nome do hotel.');
                 return;
@@ -272,7 +264,6 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
                 checkOutDate: checkOutDate.toISOString(),
             };
         } else if (selectedCategory === 'car') {
-            console.log('🚗 [DEBUG] Validando carro...');
             if (!carRental.trim()) {
                 Alert.alert('Atenção', 'Por favor, preencha a locadora.');
                 return;
@@ -304,34 +295,24 @@ const NewBookingScreen: React.FC<Props> = ({ navigation, route }) => {
             };
         }
 
-        console.log('📦 [DEBUG] Objeto de reserva criado:', JSON.stringify(newBooking, null, 2));
 
         try {
             const saved = await AsyncStorage.getItem('travelease_bookings');
-            console.log('📂 [DEBUG] Dados existentes:', saved);
 
             let bookings = saved ? JSON.parse(saved) : [];
-            console.log('📋 [DEBUG] Array atual de bookings:', bookings.length, 'itens');
 
             if (editingBooking) {
-                console.log('✏️ [DEBUG] Editando reserva existente:', editingBooking.id);
                 bookings = bookings.map((b: any) => b.id === editingBooking.id ? newBooking : b);
             } else {
-                console.log('➕ [DEBUG] Adicionando nova reserva');
                 bookings = [newBooking, ...bookings];
             }
 
-            console.log('💾 [DEBUG] Salvando array com', bookings.length, 'itens');
-            console.log('💾 [DEBUG] Dados a salvar:', JSON.stringify(bookings, null, 2));
 
             await AsyncStorage.setItem('travelease_bookings', JSON.stringify(bookings));
 
-            console.log('✅ [DEBUG] Dados salvos com sucesso!');
-            console.log('🔙 [DEBUG] Voltando para lista...');
 
             navigation.goBack();
         } catch (error) {
-            console.error('❌ [DEBUG] Erro ao salvar:', error);
             Alert.alert('Erro', 'Não foi possível salvar a reserva. Tente novamente.');
         }
     };
