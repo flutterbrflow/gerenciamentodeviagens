@@ -54,12 +54,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [showEndPicker, setShowEndPicker] = useState(false);
     const [editCoverImage, setEditCoverImage] = useState<string | null>(null);
 
-    // Temp states for calendar
-    const [tempStartDate, setTempStartDate] = useState<Date>(new Date());
-    const [tempEndDate, setTempEndDate] = useState<Date>(new Date());
-    const [showStartDateModal, setShowStartDateModal] = useState(false);
-    const [showEndDateModal, setShowEndDateModal] = useState(false);
-
     // Feature Modals State
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
@@ -397,35 +391,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             console.error('Error selecting cover image:', error);
             Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
         }
-    };
-
-    // Calendar Modal Handlers
-    const openStartDateModal = () => {
-        setTempStartDate(editStartDate || new Date());
-        setShowStartDateModal(true);
-    };
-
-    const openEndDateModal = () => {
-        setTempEndDate(editEndDate || new Date());
-        setShowEndDateModal(true);
-    };
-
-    const confirmStartDate = () => {
-        setEditStartDate(tempStartDate);
-        setShowStartDateModal(false);
-    };
-
-    const confirmEndDate = () => {
-        setEditEndDate(tempEndDate);
-        setShowEndDateModal(false);
-    };
-
-    const onStartDateChange = (event: any, selectedDate?: Date) => {
-        if (selectedDate) setTempStartDate(selectedDate);
-    };
-
-    const onEndDateChange = (event: any, selectedDate?: Date) => {
-        if (selectedDate) setTempEndDate(selectedDate);
     };
 
     const formatDate = (date: Date | null): string => {
@@ -1175,32 +1140,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 />
                             </View>
 
-                            {/* Dates */}
-                            <View style={styles.modalSection}>
-                                <Text style={styles.modalLabel}>Datas da Viagem</Text>
-                                <View style={styles.dateRow}>
-                                    <TouchableOpacity
-                                        style={styles.modalDateButton}
-                                        onPress={openStartDateModal}
-                                    >
-                                        <Text style={styles.modalDateLabel}>IDA</Text>
-                                        <Text style={styles.modalDateValue}>
-                                            {formatDate(editStartDate)}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.modalDateButton}
-                                        onPress={openEndDateModal}
-                                    >
-                                        <Text style={styles.modalDateLabel}>VOLTA</Text>
-                                        <Text style={styles.modalDateValue}>
-                                            {formatDate(editEndDate)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
                             {/* Notes */}
                             <View style={styles.modalSection}>
                                 <Text style={styles.modalLabel}>Notas</Text>
@@ -1234,42 +1173,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                         </ScrollView>
                     </View>
                 </KeyboardAvoidingView>
-            </Modal>
-
-            {/* Start Date Picker Modal */}
-            <Modal visible={showStartDateModal} animationType="slide" transparent={true} onRequestClose={() => setShowStartDateModal(false)}>
-                <View style={styles.pickerOverlay}>
-                    <View style={styles.pickerContainer}>
-                        <View style={styles.pickerHeader}>
-                            <TouchableOpacity onPress={() => setShowStartDateModal(false)}>
-                                <Text style={styles.pickerCancelText}>Cancelar</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.pickerTitle}>Data de Ida</Text>
-                            <TouchableOpacity onPress={confirmStartDate}>
-                                <Text style={styles.pickerConfirmText}>Confirmar</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <DateTimePicker value={tempStartDate} mode="date" display="spinner" onChange={onStartDateChange} locale="pt-BR" style={styles.picker} />
-                    </View>
-                </View>
-            </Modal>
-
-            {/* End Date Picker Modal */}
-            <Modal visible={showEndDateModal} animationType="slide" transparent={true} onRequestClose={() => setShowEndDateModal(false)}>
-                <View style={styles.pickerOverlay}>
-                    <View style={styles.pickerContainer}>
-                        <View style={styles.pickerHeader}>
-                            <TouchableOpacity onPress={() => setShowEndDateModal(false)}>
-                                <Text style={styles.pickerCancelText}>Cancelar</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.pickerTitle}>Data de Volta</Text>
-                            <TouchableOpacity onPress={confirmEndDate}>
-                                <Text style={styles.pickerConfirmText}>Confirmar</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <DateTimePicker value={tempEndDate} mode="date" display="spinner" onChange={onEndDateChange} minimumDate={editStartDate || undefined} locale="pt-BR" style={styles.picker} />
-                    </View>
-                </View>
             </Modal>
 
             {/* Itinerary Modal */}
