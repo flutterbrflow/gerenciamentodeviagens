@@ -19,7 +19,7 @@
 
 ---
 
-## [Dezembro 2024] - Sistema de Orçamento Completo
+## [Dezembro 2025] - Sistema de Orçamento Completo
 
 ### ✅ Adicionado
 - **9 Categorias de Despesas**: Alimentação, Transporte, Hospedagem, Atividades, Compras, Saúde, Lazer, Emergências, Presentes
@@ -30,7 +30,7 @@
 
 ---
 
-## [Outubro 2024] - Memórias (Galeria de Fotos)
+## [Dezembro 2025] - Memórias (Galeria de Fotos)
 
 ### ✅ Adicionado
 - **Upload de Fotos**: Câmera ou galeria nativa
