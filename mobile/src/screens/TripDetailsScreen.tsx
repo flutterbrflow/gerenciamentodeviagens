@@ -54,7 +54,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [showEndPicker, setShowEndPicker] = useState(false);
     const [editCoverImage, setEditCoverImage] = useState<string | null>(null);
 
-    // Calendar Modal States
+    // Temp states for calendar
     const [tempStartDate, setTempStartDate] = useState<Date>(new Date());
     const [tempEndDate, setTempEndDate] = useState<Date>(new Date());
     const [showStartDateModal, setShowStartDateModal] = useState(false);

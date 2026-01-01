@@ -4,6 +4,7 @@
 
 ### ✅ Adicionado
 - **Edit Trip - Foto de Capa**: Modal para alterar foto da viagem existente
+- **Edit Trip - Calendário Inline**: Seleção de datas melhorada com inline pickers (funcional e responsivo)
 - **Placeholder para Viagens sem Foto**: Exibição de "Sem foto de capa" quando viagem não tem imagem
 - **Filtro "Passadas" Automático**: Status da viagem calculado automaticamente por data
 - **Padronização de Ícones "+"**: Todos os botões de adicionar (Evento, Reserva, Tarefa, Despesa) agora usam círculo tracejado com ícone MaterialIcons
