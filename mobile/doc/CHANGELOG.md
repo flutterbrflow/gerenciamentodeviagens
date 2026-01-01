@@ -6,6 +6,7 @@
 - **Edit Trip - Foto de Capa**: Modal para alterar foto da viagem existente
 - **Placeholder para Viagens sem Foto**: Exibição de "Sem foto de capa" quando viagem não tem imagem
 - **Filtro "Passadas" Automático**: Status da viagem calculado automaticamente por data
+- **Padronização de Ícones "+"**: Todos os botões de adicionar (Evento, Reserva, Tarefa, Despesa) agora usam círculo tracejado com ícone MaterialIcons
 
 ### 🔧 Corrigido
 - **Home Screen - Data Display**: Corrigido "Em NaN meses" → agora mostra "Em X meses" corretamente
@@ -47,7 +48,6 @@ Ver [ROADMAP.md](./ROADMAP.md) para plano completo.
 
 ### Prioridade Alta
 - Calendário Modal no Edit Trip
-- Padronização de ícones "+"
 - Backend com Supabase
 - Autenticação Social
 
