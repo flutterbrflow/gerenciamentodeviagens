@@ -48,10 +48,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [editDestination, setEditDestination] = useState('');
     const [editNotes, setEditNotes] = useState('');
-    const [editStartDate, setEditStartDate] = useState<Date | null>(null);
-    const [editEndDate, setEditEndDate] = useState<Date | null>(null);
-    const [showStartPicker, setShowStartPicker] = useState(false);
-    const [showEndPicker, setShowEndPicker] = useState(false);
     const [editCoverImage, setEditCoverImage] = useState<string | null>(null);
 
     // Feature Modals State
@@ -361,10 +357,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             setEditDestination(tripData.destination);
             setEditNotes(tripData.notes || '');
             setEditCoverImage(tripData.imageUrl || null);
-            // Initialize with today instead of null
-            const today = new Date();
-            setEditStartDate(today);
-            setEditEndDate(null);
             setShowEditModal(true);
         }
     };
@@ -423,42 +415,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         return `${startDay} ${month}, ${year}`;
     };
 
-    const handleStartDateChange = (event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowStartPicker(false);
-        }
-
-        if (event.type === 'set' && selectedDate) {
-            const newDate = new Date(selectedDate);
-            setEditStartDate(newDate);
-            if (editEndDate && selectedDate > editEndDate) {
-                setEditEndDate(null);
-            }
-            if (Platform.OS === 'ios') {
-                setShowStartPicker(false);
-            }
-        } else if (event.type === 'dismissed') {
-            setShowStartPicker(false);
-        }
-    };
-
-    const handleEndDateChange = (event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowEndPicker(false);
-        }
-
-        if (event.type === 'set' && selectedDate) {
-            // Force update with new date instance to ensure state changes
-            const newDate = new Date(selectedDate);
-            setEditEndDate(newDate);
-            if (Platform.OS === 'ios') {
-                setShowEndPicker(false);
-            }
-        } else if (event.type === 'dismissed') {
-            setShowEndPicker(false);
-        }
-    };
-
     const handleSaveEdit = async () => {
         if (!tripData) return;
 
@@ -466,7 +422,6 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             ...tripData,
             destination: editDestination.trim(),
             notes: editNotes.trim(),
-            dateRange: editStartDate ? formatDateRange(editStartDate, editEndDate) : tripData.dateRange,
             imageUrl: editCoverImage || tripData.imageUrl,
         };
 
@@ -1783,14 +1738,16 @@ const styles = StyleSheet.create({
         height: 200,
     },
     addButtonDashed: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        borderWidth: 2,
-        borderStyle: 'dashed',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 1.5,
         borderColor: '#137fec',
-        justifyContent: 'center',
+        borderStyle: 'dashed',
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    categoryIcons: {
         backgroundColor: '#fff',
         marginBottom: 16,
     },
