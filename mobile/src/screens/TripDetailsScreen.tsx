@@ -600,10 +600,10 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 return (
                     <View style={styles.tabContent}>
                         <TouchableOpacity
-                            style={styles.addButton}
+                            style={styles.addButtonDashed}
                             onPress={() => openEventModal()}
                         >
-                            <Text style={styles.addButtonText}>+ Novo Evento</Text>
+                            <MaterialIcons name="add" size={24} color="#137fec" />
                         </TouchableOpacity>
 
                         {tripEvents.length > 0 ? (
@@ -642,10 +642,10 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 return (
                     <View style={styles.tabContent}>
                         <TouchableOpacity
-                            style={styles.addButton}
+                            style={styles.addButtonDashed}
                             onPress={() => setShowBookingModal(true)}
                         >
-                            <Text style={styles.addButtonText}>+ Nova Reserva</Text>
+                            <MaterialIcons name="add" size={24} color="#137fec" />
                         </TouchableOpacity>
 
                         {bookingsList.length > 0 ? (
@@ -684,10 +684,10 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 return (
                     <View style={styles.tabContent}>
                         <TouchableOpacity
-                            style={styles.addButton}
+                            style={styles.addButtonDashed}
                             onPress={() => openTaskModal()}
                         >
-                            <Text style={styles.addButtonText}>+ Nova Tarefa</Text>
+                            <MaterialIcons name="add" size={24} color="#137fec" />
                         </TouchableOpacity>
 
                         {tasks.map(task => (
@@ -738,10 +738,10 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                 return (
                     <View style={styles.tabContent}>
                         <TouchableOpacity
-                            style={styles.addButton}
+                            style={styles.addButtonDashed}
                             onPress={() => openExpenseModal()}
                         >
-                            <Text style={styles.addButtonText}>+ Nova Despesa</Text>
+                            <MaterialIcons name="add" size={24} color="#137fec" />
                         </TouchableOpacity>
 
                         {expenses.length > 0 ? (
@@ -1813,6 +1813,18 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#9ca3af',
+    },
+    addButtonDashed: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        borderColor: '#137fec',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        marginBottom: 16,
     },
 });
 
