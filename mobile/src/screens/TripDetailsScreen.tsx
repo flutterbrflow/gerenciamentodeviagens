@@ -54,6 +54,12 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [showEndPicker, setShowEndPicker] = useState(false);
     const [editCoverImage, setEditCoverImage] = useState<string | null>(null);
 
+    // Calendar Modal States
+    const [tempStartDate, setTempStartDate] = useState<Date>(new Date());
+    const [tempEndDate, setTempEndDate] = useState<Date>(new Date());
+    const [showStartDateModal, setShowStartDateModal] = useState(false);
+    const [showEndDateModal, setShowEndDateModal] = useState(false);
+
     // Feature Modals State
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
@@ -391,6 +397,35 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             console.error('Error selecting cover image:', error);
             Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
         }
+    };
+
+    // Calendar Modal Handlers
+    const openStartDateModal = () => {
+        setTempStartDate(editStartDate || new Date());
+        setShowStartDateModal(true);
+    };
+
+    const openEndDateModal = () => {
+        setTempEndDate(editEndDate || new Date());
+        setShowEndDateModal(true);
+    };
+
+    const confirmStartDate = () => {
+        setEditStartDate(tempStartDate);
+        setShowStartDateModal(false);
+    };
+
+    const confirmEndDate = () => {
+        setEditEndDate(tempEndDate);
+        setShowEndDateModal(false);
+    };
+
+    const onStartDateChange = (event: any, selectedDate?: Date) => {
+        if (selectedDate) setTempStartDate(selectedDate);
+    };
+
+    const onEndDateChange = (event: any, selectedDate?: Date) => {
+        if (selectedDate) setTempEndDate(selectedDate);
     };
 
     const formatDate = (date: Date | null): string => {
@@ -1145,68 +1180,25 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 <Text style={styles.modalLabel}>Datas da Viagem</Text>
                                 <View style={styles.dateRow}>
                                     <TouchableOpacity
-                                        style={[
-                                            styles.modalDateButton,
-                                            showStartPicker && styles.modalDateButtonActive,
-                                        ]}
-                                        onPress={() => {
-                                            setShowEndPicker(false);
-                                            setShowStartPicker(true);
-                                        }}
+                                        style={styles.modalDateButton}
+                                        onPress={openStartDateModal}
                                     >
                                         <Text style={styles.modalDateLabel}>IDA</Text>
-                                        <Text style={styles.modalDateValue}>{formatDate(editStartDate)}</Text>
+                                        <Text style={styles.modalDateValue}>
+                                            {formatDate(editStartDate)}
+                                        </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
-                                        style={[
-                                            styles.modalDateButton,
-                                            showEndPicker && styles.modalDateButtonActive,
-                                            !editStartDate && styles.modalDateButtonDisabled,
-                                        ]}
-                                        onPress={() => {
-                                            if (editStartDate) {
-                                                setShowStartPicker(false);
-                                                // Small delay to ensure state updates before opening end picker
-                                                setTimeout(() => {
-                                                    setShowEndPicker(true);
-                                                }, 100);
-                                            }
-                                        }}
-                                        disabled={!editStartDate}
+                                        style={styles.modalDateButton}
+                                        onPress={openEndDateModal}
                                     >
                                         <Text style={styles.modalDateLabel}>VOLTA</Text>
-                                        <Text style={styles.modalDateValue}>{formatDate(editEndDate)}</Text>
+                                        <Text style={styles.modalDateValue}>
+                                            {formatDate(editEndDate)}
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
-
-                                {showStartPicker && (
-                                    <DateTimePicker
-                                        key="start-date-picker"
-                                        value={editStartDate || new Date()}
-                                        mode="date"
-                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                        onChange={handleStartDateChange}
-                                        minimumDate={new Date()}
-                                        locale="pt-BR"
-                                    />
-                                )}
-
-                                {showEndPicker && editStartDate && (
-                                    <DateTimePicker
-                                        key={`end-date-picker-${editStartDate.getTime()}`}
-                                        value={editEndDate || (() => {
-                                            const nextDay = new Date(editStartDate);
-                                            nextDay.setDate(nextDay.getDate() + 1);
-                                            return nextDay;
-                                        })()}
-                                        mode="date"
-                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                        onChange={handleEndDateChange}
-                                        minimumDate={editStartDate}
-                                        locale="pt-BR"
-                                    />
-                                )}
                             </View>
 
                             {/* Notes */}
@@ -1242,6 +1234,42 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                         </ScrollView>
                     </View>
                 </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Start Date Picker Modal */}
+            <Modal visible={showStartDateModal} animationType="slide" transparent={true} onRequestClose={() => setShowStartDateModal(false)}>
+                <View style={styles.pickerOverlay}>
+                    <View style={styles.pickerContainer}>
+                        <View style={styles.pickerHeader}>
+                            <TouchableOpacity onPress={() => setShowStartDateModal(false)}>
+                                <Text style={styles.pickerCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.pickerTitle}>Data de Ida</Text>
+                            <TouchableOpacity onPress={confirmStartDate}>
+                                <Text style={styles.pickerConfirmText}>Confirmar</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <DateTimePicker value={tempStartDate} mode="date" display="spinner" onChange={onStartDateChange} locale="pt-BR" style={styles.picker} />
+                    </View>
+                </View>
+            </Modal>
+
+            {/* End Date Picker Modal */}
+            <Modal visible={showEndDateModal} animationType="slide" transparent={true} onRequestClose={() => setShowEndDateModal(false)}>
+                <View style={styles.pickerOverlay}>
+                    <View style={styles.pickerContainer}>
+                        <View style={styles.pickerHeader}>
+                            <TouchableOpacity onPress={() => setShowEndDateModal(false)}>
+                                <Text style={styles.pickerCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.pickerTitle}>Data de Volta</Text>
+                            <TouchableOpacity onPress={confirmEndDate}>
+                                <Text style={styles.pickerConfirmText}>Confirmar</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <DateTimePicker value={tempEndDate} mode="date" display="spinner" onChange={onEndDateChange} minimumDate={editStartDate || undefined} locale="pt-BR" style={styles.picker} />
+                    </View>
+                </View>
             </Modal>
 
             {/* Itinerary Modal */}
@@ -1813,6 +1841,43 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#9ca3af',
+    },
+    pickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    pickerContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: 20,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    pickerTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1f2937',
+    },
+    pickerCancelText: {
+        fontSize: 16,
+        color: '#6b7280',
+    },
+    pickerConfirmText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#137fec',
+    },
+    picker: {
+        height: 200,
     },
     addButtonDashed: {
         width: 48,
