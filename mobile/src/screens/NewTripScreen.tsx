@@ -10,12 +10,14 @@ import {
     Alert,
     Platform,
     Modal,
+    Image,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Trip } from '../types';
 import { TripsStorage } from '../utils/storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 
 type NewTripNavigationProp = NativeStackNavigationProp<RootStackParamList, 'NewTrip'>;
 
@@ -27,8 +29,9 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
     const [destination, setDestination] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
+    const [coverImage, setCoverImage] = useState<string | null>(null);
 
-    // Date states
+    // Date states - SIMPLIFIED
     const [startDate, setStartDate] = useState<Date>(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -40,9 +43,10 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
         future.setHours(0, 0, 0, 0);
         return future;
     });
-    const [showPicker, setShowPicker] = useState(false);
-    const [currentPicker, setCurrentPicker] = useState<'start' | 'end'>('start');
-    const [tempValue, setTempValue] = useState<Date>(new Date());
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
+    const [tempStartDate, setTempStartDate] = useState<Date>(new Date());
+    const [tempEndDate, setTempEndDate] = useState<Date>(new Date());
 
     const formatDate = (date: Date): string => {
         return date.toLocaleDateString('pt-BR', {
@@ -56,52 +60,85 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
 
         const startDay = start.getDate();
         const endDay = end?.getDate();
-        const month = start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        // Capitalize first letter: "fev" → "Fev"
+        const startMonthRaw = start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        const startMonth = startMonthRaw.charAt(0).toUpperCase() + startMonthRaw.slice(1);
         const year = start.getFullYear();
 
         if (end && start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
-            return `${startDay} - ${endDay} ${month}, ${year}`;
+            // Same month: "10 Out - 24 Out, 2024"
+            return `${startDay} ${startMonth} - ${endDay} ${startMonth}, ${year}`;
         } else if (end) {
-            const endMonth = end.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-            return `${startDay} ${month} - ${endDay} ${endMonth}, ${year}`;
+            const endMonthRaw = end.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+            const endMonth = endMonthRaw.charAt(0).toUpperCase() + endMonthRaw.slice(1);
+            // Different months: "15 Dez - 5 Jan, 2024"
+            return `${startDay} ${startMonth} - ${endDay} ${endMonth}, ${year}`;
         }
 
-        return `${startDay} ${month}, ${year}`;
+        return `${startDay} ${startMonth}, ${year}`;
     };
 
-    const openDatePicker = (type: 'start' | 'end') => {
-        setCurrentPicker(type);
-        setTempValue(type === 'start' ? startDate : endDate);
-        setShowPicker(true);
-    };
-
-    const handlePickerChange = (event: any, selectedDate?: Date) => {
+    // Simplified date handlers - only update temp state
+    const handleStartDateChange = (event: any, selectedDate?: Date) => {
         if (selectedDate) {
-            setTempValue(selectedDate);
+            setTempStartDate(selectedDate);
         }
     };
 
-    const handlePickerConfirm = () => {
-        if (currentPicker === 'start') {
-            setStartDate(tempValue);
-            // Auto-adjust end date if it's before start date
-            if (tempValue > endDate) {
-                const nextDay = new Date(tempValue);
-                nextDay.setDate(nextDay.getDate() + 1);
-                setEndDate(nextDay);
-            }
-        } else {
-            // Validate end date
-            if (tempValue < startDate) {
-                setShowPicker(false);
-                setTimeout(() => {
-                    Alert.alert('Atenção', 'A data de volta não pode ser anterior à data de ida.');
-                }, 100);
+    const handleEndDateChange = (event: any, selectedDate?: Date) => {
+        if (selectedDate) {
+            setTempEndDate(selectedDate);
+        }
+    };
+
+    const confirmStartDate = () => {
+        const adjusted = new Date(tempStartDate);
+        adjusted.setHours(0, 0, 0, 0);
+        setStartDate(adjusted);
+        // Auto-adjust end date if needed
+        if (adjusted > endDate) {
+            const nextDay = new Date(adjusted);
+            nextDay.setDate(nextDay.getDate() + 1);
+            nextDay.setHours(0, 0, 0, 0);
+            setEndDate(nextDay);
+        }
+        setShowStartPicker(false);
+    };
+
+    const confirmEndDate = () => {
+        const adjusted = new Date(tempEndDate);
+        adjusted.setHours(0, 0, 0, 0);
+        if (adjusted < startDate) {
+            setShowEndPicker(false);
+            Alert.alert('Atenção', 'A data de volta não pode ser anterior à data de ida.');
+            return;
+        }
+        setEndDate(adjusted);
+        setShowEndPicker(false);
+    };
+
+    const handleSelectCoverImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permissão Negada', 'Precisamos de permissão para acessar suas fotos.');
                 return;
             }
-            setEndDate(tempValue);
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [16, 9],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setCoverImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            console.error('Error selecting cover image:', error);
+            Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
         }
-        setShowPicker(false);
     };
 
     const handleSave = async () => {
@@ -117,7 +154,7 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
             destination: destination.trim(),
             country: destination.split(',')[1]?.trim() || 'Destino',
             dateRange: formatDateRange(startDate, endDate),
-            imageUrl: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800',
+            imageUrl: coverImage || '', // Empty string if no image
             status: 'upcoming',
             mediaCount: 0,
             notes: notes.trim(),
@@ -158,6 +195,35 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Cover Photo Section */}
+                <View style={styles.section}>
+                    <Text style={styles.label}>Foto de Capa (Opcional)</Text>
+                    <TouchableOpacity
+                        style={styles.coverPhotoContainer}
+                        onPress={handleSelectCoverImage}
+                        activeOpacity={0.7}
+                    >
+                        {coverImage ? (
+                            <>
+                                <Image
+                                    source={{ uri: coverImage }}
+                                    style={styles.coverPhotoImage}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.coverPhotoOverlay}>
+                                    <MaterialIcons name="edit" size={24} color="#fff" />
+                                    <Text style={styles.coverPhotoText}>Alterar Foto</Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={styles.coverPhotoPlaceholder}>
+                                <MaterialIcons name="add-photo-alternate" size={48} color="#9ca3af" />
+                                <Text style={styles.placeholderText}>Adicionar Foto de Capa</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
+
                 {/* Destination Input */}
                 <View style={styles.section}>
                     <Text style={styles.label}>Para onde você vai?</Text>
@@ -195,7 +261,11 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                             <Text style={styles.label}>Ida</Text>
                             <TouchableOpacity
                                 style={styles.dateTimeRow}
-                                onPress={() => openDatePicker('start')}
+                                onPress={() => {
+                                    setTempStartDate(startDate);
+                                    setShowEndPicker(false);
+                                    setShowStartPicker(true);
+                                }}
                             >
                                 <MaterialIcons name="flight-takeoff" size={16} color="#137fec" />
                                 <Text style={styles.dateTimeText}>{formatDate(startDate)}</Text>
@@ -206,7 +276,11 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                             <Text style={styles.label}>Volta</Text>
                             <TouchableOpacity
                                 style={styles.dateTimeRow}
-                                onPress={() => openDatePicker('end')}
+                                onPress={() => {
+                                    setTempEndDate(endDate);
+                                    setShowStartPicker(false);
+                                    setShowEndPicker(true);
+                                }}
                             >
                                 <MaterialIcons name="flight-land" size={16} color="#137fec" />
                                 <Text style={styles.dateTimeText}>{formatDate(endDate)}</Text>
@@ -241,36 +315,68 @@ const NewTripScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
             </ScrollView>
 
-            {/* Date Picker Modal */}
-            {showPicker && (
+            {/* Start Date Picker Modal */}
+            {showStartPicker && (
                 <Modal
-                    visible={showPicker}
+                    visible={showStartPicker}
                     transparent={true}
                     animationType="slide"
-                    onRequestClose={() => setShowPicker(false)}
-                    presentationStyle="overFullScreen"
+                    onRequestClose={() => setShowStartPicker(false)}
                 >
                     <View style={styles.pickerOverlay}>
                         <View style={styles.pickerContainer}>
                             <View style={styles.pickerHeader}>
-                                <TouchableOpacity onPress={() => setShowPicker(false)}>
+                                <TouchableOpacity onPress={() => setShowStartPicker(false)}>
                                     <Text style={styles.pickerCancelText}>Cancelar</Text>
                                 </TouchableOpacity>
-                                <Text style={styles.pickerTitle}>Selecionar Data</Text>
-                                <TouchableOpacity onPress={handlePickerConfirm}>
+                                <Text style={styles.pickerTitle}>Data de Ida</Text>
+                                <TouchableOpacity onPress={confirmStartDate}>
                                     <Text style={styles.pickerConfirmText}>Confirmar</Text>
                                 </TouchableOpacity>
                             </View>
                             <DateTimePicker
-                                key={`${currentPicker}-${tempValue.getTime()}`}
-                                value={tempValue}
+                                value={tempStartDate}
                                 mode="date"
-                                display="spinner"
-                                onChange={handlePickerChange}
+                                display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                                onChange={handleStartDateChange}
                                 locale="pt-BR"
+                                minimumDate={new Date()}
                                 textColor="#111418"
                                 style={styles.picker}
-                                minimumDate={currentPicker === 'start' ? new Date() : startDate}
+                            />
+                        </View>
+                    </View>
+                </Modal>
+            )}
+
+            {/* End Date Picker Modal */}
+            {showEndPicker && (
+                <Modal
+                    visible={showEndPicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowEndPicker(false)}
+                >
+                    <View style={styles.pickerOverlay}>
+                        <View style={styles.pickerContainer}>
+                            <View style={styles.pickerHeader}>
+                                <TouchableOpacity onPress={() => setShowEndPicker(false)}>
+                                    <Text style={styles.pickerCancelText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.pickerTitle}>Data de Volta</Text>
+                                <TouchableOpacity onPress={confirmEndDate}>
+                                    <Text style={styles.pickerConfirmText}>Confirmar</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                                value={tempEndDate}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                                onChange={handleEndDateChange}
+                                locale="pt-BR"
+                                minimumDate={startDate}
+                                textColor="#111418"
+                                style={styles.picker}
                             />
                         </View>
                     </View>
@@ -519,6 +625,44 @@ const styles = StyleSheet.create({
     },
     picker: {
         height: 200,
+    },
+    // Cover Photo Styles
+    coverPhotoContainer: {
+        width: '100%',
+        height: 200,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#f3f4f6',
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        borderStyle: 'dashed',
+    },
+    coverPhotoImage: {
+        width: '100%',
+        height: '100%',
+    },
+    coverPhotoOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+    },
+    coverPhotoText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    coverPhotoPlaceholder: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12,
+    },
+    placeholderText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#9ca3af',
     },
 });
 

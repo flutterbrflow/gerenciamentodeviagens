@@ -20,6 +20,7 @@ import { TripsStorage, TasksStorage, BookingsStorage, ExpensesStorage } from '..
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 
 type TripDetailsNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDetails'>;
 type TripDetailsRouteProp = RouteProp<RootStackParamList, 'TripDetails'>;
@@ -51,6 +52,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [editEndDate, setEditEndDate] = useState<Date | null>(null);
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
+    const [editCoverImage, setEditCoverImage] = useState<string | null>(null);
 
     // Feature Modals State
     const [showTaskModal, setShowTaskModal] = useState(false);
@@ -109,23 +111,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         if (savedEvents) {
             setTripEvents(JSON.parse(savedEvents));
         } else {
-            const mockEvents: TimelineEvent[] = [
-                {
-                    id: 'e1',
-                    time: '09:00',
-                    title: 'Check-in Hotel',
-                    description: 'Fazer check-in no hotel',
-                    type: 'hotel',
-                },
-                {
-                    id: 'e2',
-                    time: '14:00',
-                    title: 'Passeio Turístico',
-                    description: 'Tour pelos pontos turísticos',
-                    type: 'activity',
-                },
-            ];
-            setTripEvents(mockEvents);
+            setTripEvents([]);
         }
     };
 
@@ -374,11 +360,36 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         if (tripData) {
             setEditDestination(tripData.destination);
             setEditNotes(tripData.notes || '');
+            setEditCoverImage(tripData.imageUrl || null);
             // Initialize with today instead of null
             const today = new Date();
             setEditStartDate(today);
             setEditEndDate(null);
             setShowEditModal(true);
+        }
+    };
+
+    const handleSelectEditCoverImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permissão Negada', 'Precisamos de permissão para acessar suas fotos.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [16, 9],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setEditCoverImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            console.error('Error selecting cover image:', error);
+            Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
         }
     };
 
@@ -396,13 +407,16 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         const startDay = start.getDate();
         const endDay = end?.getDate();
-        const month = start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        const monthRaw = start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1); // Capitalize
         const year = start.getFullYear();
 
         if (end && start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
-            return `${startDay} - ${endDay} ${month}, ${year}`;
+            // Same month - include month in both dates for consistency
+            return `${startDay} ${month} - ${endDay} ${month}, ${year}`;
         } else if (end) {
-            const endMonth = end.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+            const endMonthRaw = end.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+            const endMonth = endMonthRaw.charAt(0).toUpperCase() + endMonthRaw.slice(1); // Capitalize
             return `${startDay} ${month} - ${endDay} ${endMonth}, ${year}`;
         }
 
@@ -453,6 +467,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             destination: editDestination.trim(),
             notes: editNotes.trim(),
             dateRange: editStartDate ? formatDateRange(editStartDate, editEndDate) : tripData.dateRange,
+            imageUrl: editCoverImage || tripData.imageUrl,
         };
 
         setTripData(updatedTrip);
@@ -1081,6 +1096,35 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 <Text style={styles.modalTitle}>Editar Viagem</Text>
                                 <TouchableOpacity onPress={() => setShowEditModal(false)}>
                                     <MaterialIcons name="close" size={24} color="#111418" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Cover Photo */}
+                            <View style={styles.modalSection}>
+                                <Text style={styles.modalLabel}>Foto de Capa</Text>
+                                <TouchableOpacity
+                                    style={styles.coverPhotoContainer}
+                                    onPress={handleSelectEditCoverImage}
+                                    activeOpacity={0.8}
+                                >
+                                    {editCoverImage ? (
+                                        <>
+                                            <Image
+                                                source={{ uri: editCoverImage }}
+                                                style={styles.coverPhotoImage}
+                                                resizeMode="cover"
+                                            />
+                                            <View style={styles.coverPhotoOverlay}>
+                                                <MaterialIcons name="edit" size={24} color="#fff" />
+                                                <Text style={styles.coverPhotoText}>Alterar Foto</Text>
+                                            </View>
+                                        </>
+                                    ) : (
+                                        <View style={styles.coverPhotoPlaceholder}>
+                                            <MaterialIcons name="add-photo-alternate" size={48} color="#9ca3af" />
+                                            <Text style={styles.placeholderText}>Adicionar Foto de Capa</Text>
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
                             </View>
 
@@ -1731,6 +1775,44 @@ const styles = StyleSheet.create({
     },
     expenseAmount: {
         color: '#ef4444',
+    },
+    // Cover Photo Styles
+    coverPhotoContainer: {
+        width: '100%',
+        height: 200,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#f3f4f6',
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        borderStyle: 'dashed',
+    },
+    coverPhotoImage: {
+        width: '100%',
+        height: '100%',
+    },
+    coverPhotoOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+    },
+    coverPhotoText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    coverPhotoPlaceholder: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12,
+    },
+    placeholderText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#9ca3af',
     },
 });
 

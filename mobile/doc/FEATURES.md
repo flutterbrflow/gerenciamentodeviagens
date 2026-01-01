@@ -18,6 +18,10 @@
 - **Itinerário**: Linha do tempo com eventos (voo, hotel, passeios).
 - **Reservas**: Lista de comprovantes e reservas.
 - **Tarefas**: Checklist interativo (Check-in, Malas, etc).
+- **Editar Viagem** (✅ Janeiro 2026):
+  - Alterar destino e notas
+  - **Foto de Capa**: Seletor modal de imagem
+  - Visualização de preview instantâneo
 - **Orçamento** (✅ Completo):
   - 9 categorias padrão + customizadas
   - Gráfico de tendências temporais
