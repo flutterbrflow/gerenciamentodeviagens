@@ -42,7 +42,7 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
 
     // Modal State
     const [modalVisible, setModalVisible] = useState(false);
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
     const [memoryTitle, setMemoryTitle] = useState('');
     const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
 
@@ -81,28 +81,35 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
             const saved = await MemoriesStorage.get();
             if (saved) {
                 setMemories(saved);
-            } else {
-                // Initial mock data
-                const mockData: Memory[] = [
-                    {
-                        id: '1',
-                        trip: 'Paris, França',
-                        image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=400',
-                        date: '15 Out, 2024',
-                    },
-                    {
-                        id: '2',
-                        trip: 'Tóquio, Japão',
-                        image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=400',
-                        date: '20 Dez, 2024',
-                    },
-                ];
-                setMemories(mockData);
-                await MemoriesStorage.set(mockData);
             }
+            // No initial mock data - start clean
         } catch (error) {
             console.error('Error loading memories:', error);
         }
+    };
+
+    const handleClearAllMemories = async () => {
+        Alert.alert(
+            'Limpar Todas as Memórias',
+            'Tem certeza que deseja apagar todas as memórias? Esta ação não pode ser desfeita.',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Limpar Tudo',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await MemoriesStorage.set([]);
+                            setMemories([]);
+                            Alert.alert('Sucesso', 'Todas as memórias foram apagadas.');
+                        } catch (error) {
+                            console.error('Error clearing memories:', error);
+                            Alert.alert('Erro', 'Não foi possível limpar as memórias.');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleAddPhoto = async () => {
@@ -118,23 +125,25 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
-                aspect: [4, 3],
+                allowsMultipleSelection: true,
+                selectionLimit: 20, // Limit to 20 photos at once
+                orderedSelection: true, // Show numbered badges in selection order
                 quality: 0.8,
                 exif: true,
             });
 
-            if (!result.canceled && result.assets[0]) {
-                const asset = result.assets[0];
-                setSelectedImage(asset.uri);
+            if (!result.canceled && result.assets.length > 0) {
+                const imageUris = result.assets.map(asset => asset.uri);
+                setSelectedImages(imageUris);
                 setMemoryTitle('');
                 setSelectedTripId(null);
 
-                // Try to extract date from EXIF
+                // Try to extract date from EXIF of the first image
                 let exifDate = null;
-                if (asset.exif && (asset.exif.DateTimeOriginal || asset.exif.DateTime)) {
+                const firstAsset = result.assets[0];
+                if (firstAsset.exif && (firstAsset.exif.DateTimeOriginal || firstAsset.exif.DateTime)) {
                     // Format: "YYYY:MM:DD HH:MM:SS" -> Date
-                    const dateStr = asset.exif.DateTimeOriginal || asset.exif.DateTime;
+                    const dateStr = firstAsset.exif.DateTimeOriginal || firstAsset.exif.DateTime;
                     if (dateStr) {
                         // Simple parsing approach for "YYYY:MM:DD"
                         const parts = dateStr.split(' ')[0].split(':');
@@ -160,14 +169,18 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
 
     const handleCloseModal = () => {
         setModalVisible(false);
-        setSelectedImage(null);
+        setSelectedImages([]);
         setMemoryTitle('');
         setSelectedTripId(null);
         setTempDate(null);
     };
 
+    const handleRemoveImage = (index: number) => {
+        setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleSaveMemory = async () => {
-        if (!selectedImage) return;
+        if (selectedImages.length === 0) return;
 
         try {
             let tripName = 'Nova Memória';
@@ -195,14 +208,15 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
                 memoryDate = tempDate;
             }
 
-            const newMemory: Memory = {
-                id: Date.now().toString(),
+            // Create a memory for each selected image
+            const newMemories: Memory[] = selectedImages.map((imageUri, index) => ({
+                id: `${Date.now()}_${index}`,
                 trip: tripName,
-                image: selectedImage,
+                image: imageUri,
                 date: memoryDate,
-            };
+            }));
 
-            const updatedMemories = [newMemory, ...memories];
+            const updatedMemories = [...newMemories, ...memories];
             setMemories(updatedMemories);
             await MemoriesStorage.set(updatedMemories);
 
@@ -218,12 +232,20 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Minhas Memórias</Text>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={handleAddPhoto}
-                >
-                    <MaterialIcons name="add-a-photo" size={20} color="#137fec" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                        style={[styles.addButton, { backgroundColor: '#fee2e2' }]}
+                        onPress={handleClearAllMemories}
+                    >
+                        <MaterialIcons name="delete" size={20} color="#dc2626" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={handleAddPhoto}
+                    >
+                        <MaterialIcons name="add-a-photo" size={20} color="#137fec" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView
@@ -292,8 +314,28 @@ const MemoriesScreen: React.FC<Props> = ({ navigation }) => {
                         </View>
 
                         <ScrollView style={styles.modalForm}>
-                            {selectedImage && (
-                                <Image source={{ uri: selectedImage }} style={styles.modalImage} resizeMode="cover" />
+                            {selectedImages.length > 0 && (
+                                <View style={styles.multiImagePreview}>
+                                    <View style={styles.imageCountHeader}>
+                                        <Text style={styles.imageCountBadge}>
+                                            {selectedImages.length} {selectedImages.length === 1 ? 'foto' : 'fotos'}
+                                        </Text>
+                                    </View>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageGallery}>
+                                        {selectedImages.map((uri, index) => (
+                                            <View key={index} style={styles.previewImageContainer}>
+                                                <Image source={{ uri }} style={styles.previewImage} resizeMode="cover" />
+                                                <TouchableOpacity
+                                                    style={styles.removeImageButton}
+                                                    onPress={() => handleRemoveImage(index)}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <MaterialIcons name="close" size={18} color="#fff" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))}
+                                    </ScrollView>
+                                </View>
                             )}
 
                             <Text style={styles.inputLabel}>Título / Legenda</Text>
@@ -549,6 +591,48 @@ const styles = StyleSheet.create({
         height: 200,
         borderRadius: 12,
         marginBottom: 20,
+    },
+    multiImagePreview: {
+        marginBottom: 20,
+    },
+    imageCountHeader: {
+        marginBottom: 12,
+    },
+    imageCountBadge: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#137fec',
+        backgroundColor: '#eff6ff',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    imageGallery: {
+        flexDirection: 'row',
+    },
+    previewImageContainer: {
+        width: 120,
+        height: 120,
+        marginRight: 12,
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    removeImageButton: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     inputLabel: {
         fontSize: 14,

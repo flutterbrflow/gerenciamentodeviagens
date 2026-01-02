@@ -47,18 +47,28 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             const memories = await MemoriesStorage.get();
             if (!memories) return trips;
 
-            // Count memories per trip destination
-            const memoryCounts: Record<string, number> = {};
-            memories.forEach((memory: any) => {
-                const tripName = memory.trip || '';
-                memoryCounts[tripName] = (memoryCounts[tripName] || 0) + 1;
-            });
+            // Update trips with actual media counts using partial matching
+            return trips.map(trip => {
+                const tripDest = trip.destination.trim().toLowerCase();
 
-            // Update trips with actual media counts
-            return trips.map(trip => ({
-                ...trip,
-                mediaCount: memoryCounts[trip.destination] || 0
-            }));
+                // Count memories that match this trip (exact or partial match)
+                const count = memories.filter((memory: any) => {
+                    const memoryTrip = (memory.trip || '').trim().toLowerCase();
+
+                    // Match if:
+                    // 1. Exact match
+                    // 2. Memory trip is contained in destination (e.g., "Rio Quente" in "Rio Quente, Goiás")
+                    // 3. Destination is contained in memory trip
+                    return memoryTrip === tripDest ||
+                        tripDest.includes(memoryTrip) ||
+                        memoryTrip.includes(tripDest);
+                }).length;
+
+                return {
+                    ...trip,
+                    mediaCount: count
+                };
+            });
         } catch (error) {
             console.error('Error updating media counts:', error);
             return trips;
@@ -133,6 +143,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
             const diffTime = startDate.getTime() - today.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // Handle past trips
+            if (diffDays < 0) return 'Já passou';
 
             if (diffDays === 0) return 'É hoje!';
             if (diffDays <= 60) return `Faltam ${diffDays} dias`;
