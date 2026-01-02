@@ -11,12 +11,12 @@ export interface Trip {
   destination: string;
   country: string;
   dateRange: string;
-  imageUrl: string;
-  status: 'upcoming' | 'past' | 'planning';
-  daysLeft?: number;
-  timeframe?: string;
+  startDate?: Date | string;  // Optional date fields for calendar
+  endDate?: Date | string;
+  imageUrl?: string;
+  status: 'upcoming' | 'ongoing' | 'completed';
   travelers?: Traveler[];
-  mediaCount?: number;
+  mediaCount: number;
   notes?: string;
 }
 

@@ -50,6 +50,14 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [editNotes, setEditNotes] = useState('');
     const [editCoverImage, setEditCoverImage] = useState<string | null>(null);
 
+    // Date states (following NewTripScreen pattern)
+    const [editStartDate, setEditStartDate] = useState<Date | null>(null);
+    const [editEndDate, setEditEndDate] = useState<Date | null>(null);
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
+    const [tempStartDate, setTempStartDate] = useState<Date>(new Date());
+    const [tempEndDate, setTempEndDate] = useState<Date>(new Date());
+
     // Feature Modals State
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
@@ -283,7 +291,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             setEditingExpenseId(expense.id);
             setNewExpenseTitle(expense.description);
             setNewExpenseAmount(expense.amount.toString().replace('.', ','));
-            setNewExpenseCategory(expense.category);
+            setNewExpenseCategory(expense.category as ExpenseCategory);
         } else {
             setEditingExpenseId(null);
             setNewExpenseTitle('');
@@ -357,6 +365,14 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             setEditDestination(tripData.destination);
             setEditNotes(tripData.notes || '');
             setEditCoverImage(tripData.imageUrl || null);
+
+            // Load existing dates
+            const startDate = tripData.startDate ? new Date(tripData.startDate) : null;
+            const endDate = tripData.endDate ? new Date(tripData.endDate) : null;
+            console.log('[DEBUG] Loading trip dates', { startDate, endDate });
+            setEditStartDate(startDate);
+            setEditEndDate(endDate);
+
             setShowEditModal(true);
         }
     };
@@ -383,6 +399,50 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             console.error('Error selecting cover image:', error);
             Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
         }
+    };
+
+    // Date Handlers (following NewTripScreen pattern)
+    const handleStartDateChange = (event: any, selectedDate?: Date) => {
+        console.log('[DEBUG] handleStartDateChange called', { selectedDate });
+        if (selectedDate) {
+            setTempStartDate(selectedDate);
+        }
+    };
+
+    const handleEndDateChange = (event: any, selectedDate?: Date) => {
+        console.log('[DEBUG] handleEndDateChange called', { selectedDate });
+        if (selectedDate) {
+            setTempEndDate(selectedDate);
+        }
+    };
+
+    const confirmStartDate = () => {
+        console.log('[DEBUG] confirmStartDate called', { tempStartDate });
+        const adjusted = new Date(tempStartDate);
+        adjusted.setHours(0, 0, 0, 0);
+        setEditStartDate(adjusted);
+        // Auto-adjust end date if needed
+        if (editEndDate && adjusted > editEndDate) {
+            console.log('[DEBUG] Auto-adjusting end date');
+            const nextDay = new Date(adjusted);
+            nextDay.setDate(nextDay.getDate() + 1);
+            nextDay.setHours(0, 0, 0, 0);
+            setEditEndDate(nextDay);
+        }
+        setShowStartPicker(false);
+    };
+
+    const confirmEndDate = () => {
+        console.log('[DEBUG] confirmEndDate called', { tempEndDate });
+        const adjusted = new Date(tempEndDate);
+        adjusted.setHours(0, 0, 0, 0);
+        if (editStartDate && adjusted < editStartDate) {
+            setShowEndPicker(false);
+            Alert.alert('Atenção', 'A data de volta não pode ser anterior à data de ida.');
+            return;
+        }
+        setEditEndDate(adjusted);
+        setShowEndPicker(false);
     };
 
     const formatDate = (date: Date | null): string => {
@@ -418,12 +478,21 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     const handleSaveEdit = async () => {
         if (!tripData) return;
 
+        console.log('[DEBUG] Saving trip with dates', { editStartDate, editEndDate });
+
         const updatedTrip: Trip = {
             ...tripData,
             destination: editDestination.trim(),
             notes: editNotes.trim(),
             imageUrl: editCoverImage || tripData.imageUrl,
+            // Save dates
+            startDate: editStartDate || tripData.startDate,
+            endDate: editEndDate || tripData.endDate,
+            // Update dateRange string if dates exist
+            dateRange: editStartDate ? formatDateRange(editStartDate, editEndDate) : tripData.dateRange,
         };
+
+        console.log('[DEBUG] Updated trip object', updatedTrip);
 
         setTripData(updatedTrip);
 
@@ -704,7 +773,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 <View key={expense.id} style={styles.transactionCard}>
                                     <View style={styles.iconContainer}>
                                         <MaterialIcons
-                                            name={getCategoryIcon(expense.category)}
+                                            name={getCategoryIcon(expense.category as ExpenseCategory)}
                                             size={20}
                                             color="#ef4444"
                                         />
@@ -716,7 +785,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                         <View style={styles.transactionInfo}>
                                             <Text style={styles.transactionTitle}>{expense.description}</Text>
                                             <Text style={styles.transactionCategory}>
-                                                {getCategoryName(expense.category)} • {expense.date}
+                                                {getCategoryName(expense.category as ExpenseCategory)} • {expense.date}
                                             </Text>
                                         </View>
                                     </TouchableOpacity>
@@ -1001,7 +1070,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
                             <Text style={styles.modalLabel}>Categoria</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeContainer}>
-                                {(['food', 'transport', 'accommodation', 'shopping', 'activities', 'others'] as ExpenseCategory[]).map(cat => (
+                                {(['food', 'transport', 'accommodation', 'shopping', 'activities', 'health', 'leisure', 'emergency', 'gifts', 'others'] as ExpenseCategory[]).map(cat => (
                                     <TouchableOpacity
                                         key={cat}
                                         style={[
@@ -1095,6 +1164,135 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 />
                             </View>
 
+                            {/* Dates */}
+                            <View style={styles.modalSection}>
+                                <View style={{ flexDirection: 'row', gap: 12 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.modalLabel}>Ida</Text>
+                                        <TouchableOpacity
+                                            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', padding: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                                            onPress={() => {
+                                                console.log('[DEBUG] IDA button pressed');
+                                                setTempStartDate(editStartDate || new Date());
+                                                setShowEndPicker(false);
+                                                setShowStartPicker(true);
+                                            }}
+                                        >
+                                            <MaterialIcons name="flight-takeoff" size={16} color="#137fec" />
+                                            <Text style={{ fontSize: 15, color: '#111418', fontWeight: '500', flex: 1 }}>
+                                                {editStartDate ? formatDate(editStartDate) : 'Selecionar'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.modalLabel}>Volta</Text>
+                                        <TouchableOpacity
+                                            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', padding: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                                            onPress={() => {
+                                                console.log('[DEBUG] VOLTA button pressed');
+                                                setTempEndDate(editEndDate || new Date());
+                                                setShowStartPicker(false);
+                                                setShowEndPicker(true);
+                                            }}
+                                        >
+                                            <MaterialIcons name="flight-land" size={16} color="#137fec" />
+                                            <Text style={{ fontSize: 15, color: '#111418', fontWeight: '500', flex: 1 }}>
+                                                {editEndDate ? formatDate(editEndDate) : 'Selecionar'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* iOS: Inline Date Pickers - RIGHT AFTER BUTTONS */}
+                                {Platform.OS === 'ios' && showStartPicker && (
+                                    <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 8, marginTop: 12 }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 }}>
+                                            <TouchableOpacity onPress={() => {
+                                                console.log('[DEBUG] Start picker canceled');
+                                                setShowStartPicker(false);
+                                            }}>
+                                                <Text style={{ color: '#6b7280', fontSize: 16, fontWeight: '600' }}>Cancelar</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => {
+                                                console.log('[DEBUG] Start date confirmed');
+                                                confirmStartDate();
+                                            }}>
+                                                <Text style={{ color: '#137fec', fontSize: 16, fontWeight: '600' }}>Confirmar</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <DateTimePicker
+                                            value={tempStartDate}
+                                            mode="date"
+                                            display="spinner"
+                                            onChange={handleStartDateChange}
+                                            locale="pt-BR"
+                                        />
+                                    </View>
+                                )}
+
+                                {Platform.OS === 'ios' && showEndPicker && (
+                                    <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 8, marginTop: 12 }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 }}>
+                                            <TouchableOpacity onPress={() => {
+                                                console.log('[DEBUG] End picker canceled');
+                                                setShowEndPicker(false);
+                                            }}>
+                                                <Text style={{ color: '#6b7280', fontSize: 16, fontWeight: '600' }}>Cancelar</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => {
+                                                console.log('[DEBUG] End date confirmed');
+                                                confirmEndDate();
+                                            }}>
+                                                <Text style={{ color: '#137fec', fontSize: 16, fontWeight: '600' }}>Confirmar</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <DateTimePicker
+                                            value={tempEndDate}
+                                            mode="date"
+                                            display="spinner"
+                                            onChange={handleEndDateChange}
+                                            minimumDate={editStartDate || undefined}
+                                            locale="pt-BR"
+                                        />
+                                    </View>
+                                )}
+
+                                {/* Android: Modal Date Pickers */}
+                                {Platform.OS === 'android' && showStartPicker && (
+                                    <DateTimePicker
+                                        value={tempStartDate}
+                                        mode="date"
+                                        display="default"
+                                        onChange={(e, d) => {
+                                            handleStartDateChange(e, d);
+                                            if (e.type === 'set' && d) {
+                                                console.log('[DEBUG] Android start date selected');
+                                                confirmStartDate();
+                                            }
+                                        }}
+                                        locale="pt-BR"
+                                    />
+                                )}
+
+                                {Platform.OS === 'android' && showEndPicker && (
+                                    <DateTimePicker
+                                        value={tempEndDate}
+                                        mode="date"
+                                        display="default"
+                                        onChange={(e, d) => {
+                                            handleEndDateChange(e, d);
+                                            if (e.type === 'set' && d) {
+                                                console.log('[DEBUG] Android end date selected');
+                                                confirmEndDate();
+                                            }
+                                        }}
+                                        minimumDate={editStartDate || undefined}
+                                        locale="pt-BR"
+                                    />
+                                )}
+                            </View>
+
                             {/* Notes */}
                             <View style={styles.modalSection}>
                                 <Text style={styles.modalLabel}>Notas</Text>
@@ -1105,8 +1303,7 @@ const TripDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
                                     placeholder="Notas sobre a viagem..."
                                     placeholderTextColor="#9ca3af"
                                     multiline
-                                    numberOfLines={4}
-                                    textAlignVertical="top"
+                                    numberOfLines={3}
                                 />
                             </View>
 
@@ -1746,6 +1943,7 @@ const styles = StyleSheet.create({
         borderStyle: 'dashed',
         alignItems: 'center',
         justifyContent: 'center',
+        alignSelf: 'flex-end',
     },
     categoryIcons: {
         backgroundColor: '#fff',
@@ -1760,6 +1958,10 @@ const getCategoryIcon = (cat: ExpenseCategory): keyof typeof MaterialIcons.glyph
         accommodation: 'hotel',
         activities: 'local-activity',
         shopping: 'shopping-bag',
+        health: 'local-hospital',
+        leisure: 'beach-access',
+        emergency: 'warning',
+        gifts: 'card-giftcard',
         others: 'attach-money',
     };
     return map[cat] || 'attach-money';
@@ -1772,6 +1974,10 @@ const getCategoryName = (cat: ExpenseCategory) => {
         accommodation: 'Hospedagem',
         activities: 'Atividades',
         shopping: 'Compras',
+        health: 'Saúde',
+        leisure: 'Lazer',
+        emergency: 'Emergência',
+        gifts: 'Presentes',
         others: 'Outros',
     };
     return map[cat];

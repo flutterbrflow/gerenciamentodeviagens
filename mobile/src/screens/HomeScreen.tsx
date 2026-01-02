@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Trip, MainTabParamList } from '../types';
-import { TripsStorage, ProfileStorage } from '../utils/storage';
+import { TripsStorage, ProfileStorage, MemoriesStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
@@ -42,10 +42,34 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         }, [])
     );
 
+    const updateTripMediaCounts = async (trips: Trip[]) => {
+        try {
+            const memories = await MemoriesStorage.get();
+            if (!memories) return trips;
+
+            // Count memories per trip destination
+            const memoryCounts: Record<string, number> = {};
+            memories.forEach((memory: any) => {
+                const tripName = memory.trip || '';
+                memoryCounts[tripName] = (memoryCounts[tripName] || 0) + 1;
+            });
+
+            // Update trips with actual media counts
+            return trips.map(trip => ({
+                ...trip,
+                mediaCount: memoryCounts[trip.destination] || 0
+            }));
+        } catch (error) {
+            console.error('Error updating media counts:', error);
+            return trips;
+        }
+    };
+
     const loadTrips = async () => {
         const savedTrips = await TripsStorage.get();
         if (savedTrips && savedTrips.length > 0) {
-            setTrips(savedTrips);
+            const tripsWithCounts = await updateTripMediaCounts(savedTrips);
+            setTrips(tripsWithCounts);
         } else {
             // Initial data
             const initialTrips: Trip[] = [
@@ -56,7 +80,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     dateRange: '10 Out - 24 Out, 2024',
                     imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800',
                     status: 'upcoming',
-                    mediaCount: 124,
+                    mediaCount: 0,
                 },
                 {
                     id: '2',
@@ -65,7 +89,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     dateRange: '15 Dez - 30 Dez, 2024',
                     imageUrl: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=800',
                     status: 'upcoming',
-                    mediaCount: 45,
+                    mediaCount: 0,
                 },
                 {
                     id: '3',
@@ -74,15 +98,17 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     dateRange: '20 Fev - 28 Fev, 2025',
                     imageUrl: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?auto=format&fit=crop&q=80&w=800',
                     status: 'upcoming',
+                    mediaCount: 0,
                 },
             ];
-            setTrips(initialTrips);
-            await TripsStorage.set(initialTrips);
+            const tripsWithCounts = await updateTripMediaCounts(initialTrips);
+            setTrips(tripsWithCounts);
+            await TripsStorage.set(tripsWithCounts);
         }
     };
 
     const filteredTrips = trips.filter(t =>
-        activeTab === 'upcoming' ? t.status !== 'past' : t.status === 'past'
+        activeTab === 'upcoming' ? t.status !== 'completed' : t.status === 'completed'
     );
 
     const getTripTiming = (dateRange: string): string => {
